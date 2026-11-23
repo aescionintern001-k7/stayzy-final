@@ -18,6 +18,7 @@ import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 import propertyRoutes from "./modules/properties/properties.routes.js";
+import bookingRoutes from "./modules/bookings/bookings.routes.js";
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use(globalRateLimiter);
 app.use(`${env.API_PREFIX}/auth`, authRoutes);
 app.use(`${env.API_PREFIX}/users`, userRoutes);
 app.use(`${env.API_PREFIX}/properties`, propertyRoutes);
+app.use(`${env.API_PREFIX}/bookings`, bookingRoutes);
 
 // Health endpoint
 app.use(healthRoutes);
