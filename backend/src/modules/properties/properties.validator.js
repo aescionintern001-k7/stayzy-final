@@ -206,23 +206,121 @@ export const updateAvailabilitySchema = z
   .strict();
 
 /**
- * Validator for querying/listing properties (GET /api/v1/properties).
+ * Helper to normalize comma-separated or array parameters into a clean string array.
+ */
+const stringOrArrayTransformer = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((val) => {
+    if (!val) return undefined;
+    if (Array.isArray(val)) {
+      const clean = val.map((s) => s.trim()).filter(Boolean);
+      return clean.length > 0 ? clean : undefined;
+    }
+    const clean = val
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return clean.length > 0 ? clean : undefined;
+  });
+
+/**
+ * Validator for querying, searching, and filtering properties (BE-07).
+ * Supports search, location, pricing, capacity, amenities, sorting, and pagination.
  */
 export const listPropertiesQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(100).default(10),
+    page: z.coerce.number().int().min(1, "Page must be at least 1").default(1),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1, "Limit must be at least 1")
+      .max(100, "Limit cannot exceed 100")
+      .default(10),
+    search: z.string().trim().max(150).optional(),
+    q: z.string().trim().max(150).optional(),
+    location: z.string().trim().max(150).optional(),
     city: z.string().trim().max(100).optional(),
+    state: z.string().trim().max(100).optional(),
     country: z.string().trim().max(100).optional(),
-    property_type: z.enum(propertyTypes).optional(),
-    room_type: z.enum(roomTypes).optional(),
-    host_id: z.string().uuid().optional(),
-    min_price: z.coerce.number().min(0).optional(),
-    max_price: z.coerce.number().min(0).optional(),
+    property_type: stringOrArrayTransformer,
+    room_type: stringOrArrayTransformer,
+    host_id: z.string().uuid("Invalid host ID format").optional(),
+    min_price: z.coerce
+      .number()
+      .min(0, "Minimum price cannot be negative")
+      .optional(),
+    max_price: z.coerce
+      .number()
+      .min(0, "Maximum price cannot be negative")
+      .optional(),
+    guests: z.coerce.number().int().min(1, "Guests must be at least 1").optional(),
+    max_guests: z.coerce.number().int().min(1, "max_guests must be at least 1").optional(),
+    bedrooms: z.coerce
+      .number()
+      .int()
+      .min(0, "Bedrooms cannot be negative")
+      .optional(),
+    beds: z.coerce.number().int().min(0, "Beds cannot be negative").optional(),
+    bathrooms: z.coerce
+      .number()
+      .min(0, "Bathrooms cannot be negative")
+      .optional(),
+    amenities: stringOrArrayTransformer,
     status: z.enum(propertyStatuses).optional(),
     is_available: z
+      .union([z.boolean(), z.string()])
+      .optional()
+      .transform((val) => {
+        if (val === undefined || val === null) return undefined;
+        if (typeof val === "boolean") return val;
+        if (val === "true" || val === "1") return true;
+        if (val === "false" || val === "0") return false;
+        return undefined;
+      }),
+    check_in: z
       .string()
-      .transform((val) => val === "true" || val === "1")
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "check_in must be in YYYY-MM-DD format")
       .optional(),
+    check_out: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "check_out must be in YYYY-MM-DD format")
+      .optional(),
+    sort_by: z
+      .enum([
+        "price_asc",
+        "price_desc",
+        "newest",
+        "oldest",
+        "name_asc",
+        "name_desc",
+      ])
+      .optional(),
+    sort: z.enum(["price", "created_at", "title"]).optional(),
+    order: z.enum(["asc", "desc"]).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => {
+      if (data.min_price !== undefined && data.max_price !== undefined) {
+        return data.min_price <= data.max_price;
+      }
+      return true;
+    },
+    {
+      message: "min_price must be less than or equal to max_price",
+      path: ["min_price"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.check_in && data.check_out) {
+        return new Date(data.check_in) < new Date(data.check_out);
+      }
+      return true;
+    },
+    {
+      message: "check_in date must be before check_out date",
+      path: ["check_in"],
+    }
+  );

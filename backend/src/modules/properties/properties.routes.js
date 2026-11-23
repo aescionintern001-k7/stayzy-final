@@ -57,11 +57,14 @@ const optionalAuthenticate = (req, res, next) => {
 };
 
 // -------------------------------------------------------------
-// Public Routes
+// Public Routes: Search & Listing Discovery (BE-06 & BE-07)
 // -------------------------------------------------------------
 
-// List active properties (public)
+// List active properties with search and filters (public)
 router.get("/", validateRequest({ query: listPropertiesQuerySchema }), listProperties);
+
+// Explicit search alias route (public)
+router.get("/search", validateRequest({ query: listPropertiesQuerySchema }), listProperties);
 
 // -------------------------------------------------------------
 // Host / Admin Routes (Require Authentication)

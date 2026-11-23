@@ -83,8 +83,12 @@ const formatPropertyRow = (row) => {
     bedrooms: row.bedrooms,
     beds: row.beds,
     bathrooms: Number.parseFloat(row.bathrooms),
-    amenities: Array.isArray(row.amenities) ? row.amenities : JSON.parse(row.amenities || "[]"),
-    images: Array.isArray(row.images) ? row.images : JSON.parse(row.images || "[]"),
+    amenities: Array.isArray(row.amenities)
+      ? row.amenities
+      : JSON.parse(row.amenities || "[]"),
+    images: Array.isArray(row.images)
+      ? row.images
+      : JSON.parse(row.images || "[]"),
     status: row.status,
     is_available: row.is_available,
     created_at: row.created_at,
@@ -262,7 +266,11 @@ export const updateProperty = async (propertyId, updateData, user) => {
 /**
  * Delete or archive a property listing.
  */
-export const deleteOrArchiveProperty = async (propertyId, user, { permanent = false } = {}) => {
+export const deleteOrArchiveProperty = async (
+  propertyId,
+  user,
+  { permanent = false } = {}
+) => {
   const existingResult = await pool.query(
     "SELECT id, host_id, status FROM properties WHERE id = $1 LIMIT 1",
     [propertyId]
@@ -299,46 +307,102 @@ export const deleteOrArchiveProperty = async (propertyId, user, { permanent = fa
     [propertyId]
   );
 
-  return { id: propertyId, archived: true, property: formatPropertyRow(updateResult.rows[0]) };
+  return {
+    id: propertyId,
+    archived: true,
+    property: formatPropertyRow(updateResult.rows[0]),
+  };
 };
 
 /**
- * Public listing of properties with pagination and filtering.
+ * Search and list properties with multi-criteria filtering, sorting, and pagination (BE-07).
  */
 export const listProperties = async (options = {}) => {
   const {
     page = 1,
     limit = 10,
+    search,
+    q,
+    location,
     city,
+    state,
     country,
     property_type,
     room_type,
     host_id,
     min_price,
     max_price,
+    guests,
+    max_guests,
+    bedrooms,
+    beds,
+    bathrooms,
+    amenities,
     status = "active",
     is_available = true,
+    sort_by,
+    sort,
+    order,
   } = options;
 
   const whereClauses = [];
   const queryParams = [];
   let paramIndex = 1;
 
+  // Status filter (defaults to 'active' for public searches)
   if (status) {
     whereClauses.push(`p.status = $${paramIndex}`);
     queryParams.push(status);
     paramIndex++;
   }
 
+  // Availability filter (defaults to true for public searches)
   if (is_available !== undefined) {
     whereClauses.push(`p.is_available = $${paramIndex}`);
     queryParams.push(is_available);
     paramIndex++;
   }
 
+  // General keyword search across title, description, city, state, country, address
+  const searchTerm = search || q;
+  if (searchTerm && searchTerm.trim() !== "") {
+    const escaped = escapeLike(searchTerm.trim());
+    whereClauses.push(`(
+      p.title ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.description ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.city ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.state ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.country ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.address ILIKE $${paramIndex} ESCAPE '\\'
+    )`);
+    queryParams.push(`%${escaped}%`);
+    paramIndex++;
+  }
+
+  // Free-text location search across city, state, country, address
+  if (location && location.trim() !== "") {
+    const escaped = escapeLike(location.trim());
+    whereClauses.push(`(
+      p.city ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.state ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.country ILIKE $${paramIndex} ESCAPE '\\' OR
+      p.address ILIKE $${paramIndex} ESCAPE '\\'
+    )`);
+    queryParams.push(`%${escaped}%`);
+    paramIndex++;
+  }
+
+  // Structured location filters
   if (city && city.trim() !== "") {
     const escaped = escapeLike(city.trim());
     whereClauses.push(`p.city ILIKE $${paramIndex} ESCAPE '\\'`);
+    queryParams.push(`%${escaped}%`);
+    paramIndex++;
+  }
+
+  if (state && state.trim() !== "") {
+    const escaped = escapeLike(state.trim());
+    whereClauses.push(`p.state ILIKE $${paramIndex} ESCAPE '\\'`);
     queryParams.push(`%${escaped}%`);
     paramIndex++;
   }
@@ -350,24 +414,40 @@ export const listProperties = async (options = {}) => {
     paramIndex++;
   }
 
+  // Property type filter (single or array/comma-separated)
   if (property_type) {
-    whereClauses.push(`p.property_type = $${paramIndex}`);
-    queryParams.push(property_type);
-    paramIndex++;
+    if (Array.isArray(property_type) && property_type.length > 0) {
+      whereClauses.push(`p.property_type = ANY($${paramIndex})`);
+      queryParams.push(property_type);
+      paramIndex++;
+    } else if (typeof property_type === "string") {
+      whereClauses.push(`p.property_type = $${paramIndex}`);
+      queryParams.push(property_type);
+      paramIndex++;
+    }
   }
 
+  // Room type filter (single or array/comma-separated)
   if (room_type) {
-    whereClauses.push(`p.room_type = $${paramIndex}`);
-    queryParams.push(room_type);
-    paramIndex++;
+    if (Array.isArray(room_type) && room_type.length > 0) {
+      whereClauses.push(`p.room_type = ANY($${paramIndex})`);
+      queryParams.push(room_type);
+      paramIndex++;
+    } else if (typeof room_type === "string") {
+      whereClauses.push(`p.room_type = $${paramIndex}`);
+      queryParams.push(room_type);
+      paramIndex++;
+    }
   }
 
+  // Host filter
   if (host_id) {
     whereClauses.push(`p.host_id = $${paramIndex}`);
     queryParams.push(host_id);
     paramIndex++;
   }
 
+  // Price range filters
   if (min_price !== undefined) {
     whereClauses.push(`p.price_per_night >= $${paramIndex}`);
     queryParams.push(min_price);
@@ -380,14 +460,89 @@ export const listProperties = async (options = {}) => {
     paramIndex++;
   }
 
-  const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+  // Capacity filters: guests, bedrooms, beds, bathrooms
+  const requiredGuests = guests !== undefined ? guests : max_guests;
+  if (requiredGuests !== undefined) {
+    whereClauses.push(`p.max_guests >= $${paramIndex}`);
+    queryParams.push(requiredGuests);
+    paramIndex++;
+  }
 
+  if (bedrooms !== undefined) {
+    whereClauses.push(`p.bedrooms >= $${paramIndex}`);
+    queryParams.push(bedrooms);
+    paramIndex++;
+  }
+
+  if (beds !== undefined) {
+    whereClauses.push(`p.beds >= $${paramIndex}`);
+    queryParams.push(beds);
+    paramIndex++;
+  }
+
+  if (bathrooms !== undefined) {
+    whereClauses.push(`p.bathrooms >= $${paramIndex}`);
+    queryParams.push(bathrooms);
+    paramIndex++;
+  }
+
+  // Amenities filtering via JSONB containment (@>)
+  // Requires all specified amenities to be present in p.amenities
+  if (amenities && Array.isArray(amenities) && amenities.length > 0) {
+    whereClauses.push(`p.amenities @> $${paramIndex}::jsonb`);
+    queryParams.push(JSON.stringify(amenities));
+    paramIndex++;
+  }
+
+  const whereSql =
+    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+  // Safe sorting mapping to prevent SQL injection
+  let orderBySql = "p.created_at DESC, p.id ASC";
+
+  const effectiveSortBy =
+    sort_by ||
+    (sort && order
+      ? `${sort}_${order}`
+      : sort
+        ? `${sort}_asc`
+        : undefined);
+
+  switch (effectiveSortBy) {
+    case "price_asc":
+      orderBySql = "p.price_per_night ASC, p.id ASC";
+      break;
+    case "price_desc":
+      orderBySql = "p.price_per_night DESC, p.id ASC";
+      break;
+    case "oldest":
+    case "created_at_asc":
+      orderBySql = "p.created_at ASC, p.id ASC";
+      break;
+    case "newest":
+    case "created_at_desc":
+      orderBySql = "p.created_at DESC, p.id ASC";
+      break;
+    case "name_asc":
+    case "title_asc":
+      orderBySql = "p.title ASC, p.id ASC";
+      break;
+    case "name_desc":
+    case "title_desc":
+      orderBySql = "p.title DESC, p.id ASC";
+      break;
+    default:
+      orderBySql = "p.created_at DESC, p.id ASC";
+  }
+
+  // Count total matching records
   const countResult = await pool.query(
     `SELECT COUNT(*)::int AS total FROM properties p ${whereSql}`,
     queryParams
   );
   const total = countResult.rows[0].total;
 
+  // Query paginated matching records
   const offset = (page - 1) * limit;
   const dataParams = [...queryParams, limit, offset];
   const dataQuery = `
@@ -400,7 +555,7 @@ export const listProperties = async (options = {}) => {
     FROM properties p
     JOIN users u ON u.id = p.host_id
     ${whereSql}
-    ORDER BY p.created_at DESC, p.id ASC
+    ORDER BY ${orderBySql}
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;
 
@@ -503,7 +658,6 @@ export const addPropertyImages = async (propertyId, newImages, user) => {
     ? existing.images
     : JSON.parse(existing.images || "[]");
 
-  // Prevent duplicate image URLs while appending new ones
   const mergedImages = [...currentImages];
   for (const img of newImages) {
     if (!mergedImages.includes(img)) {
@@ -609,7 +763,11 @@ export const updatePropertyAmenities = async (propertyId, amenities, user) => {
 /**
  * Update property availability.
  */
-export const updatePropertyAvailability = async (propertyId, is_available, user) => {
+export const updatePropertyAvailability = async (
+  propertyId,
+  is_available,
+  user
+) => {
   const existingResult = await pool.query(
     "SELECT id, host_id FROM properties WHERE id = $1 LIMIT 1",
     [propertyId]
