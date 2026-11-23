@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cookieParser from "cookie-parser";
 
 import { env } from "./config/env.js";
@@ -16,6 +16,7 @@ import {
 
 import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import userRoutes from "./modules/users/users.routes.js";
 
 const app = express();
 
@@ -36,8 +37,9 @@ app.use(cookieParser());
 // Rate limiting
 app.use(globalRateLimiter);
 
-// Authentication routes
+// Module routes
 app.use(`${env.API_PREFIX}/auth`, authRoutes);
+app.use(`${env.API_PREFIX}/users`, userRoutes);
 
 // Health endpoint
 app.use(healthRoutes);
@@ -58,5 +60,3 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;
-
-
