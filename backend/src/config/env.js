@@ -10,6 +10,14 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   JWT_EXPIRES_IN: z.string().default("1d"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  DB_HOST: z.string().default("localhost"),
+  DB_PORT: z.coerce.number().int().positive().default(5432),
+  DB_NAME: z.string().min(1).default("stayzy_dev"),
+  DB_USER: z.string().min(1).default("postgres"),
+  DB_PASSWORD: z.string().min(1, "Database password is required"),
+  DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DB_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
