@@ -9,4 +9,5 @@ export * from "./Toast";
 export * from "./animated-underline-text-one";
 export * from "./arrow-fill-button";
 export * from "./StarBorder";
+export * from "./liquid-glass-navbar";
 
