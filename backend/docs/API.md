@@ -251,7 +251,7 @@ The API base prefix is `/api/v1`.
 | `POST` | `/payments/create-order` | Guest | Initiate Razorpay order for confirmed/pending booking |
 | `POST` | `/payments/verify` | Guest | Verify Razorpay payment signature and capture payment |
 | `POST` | `/payments/fail` | Guest | Record payment failure safely |
-| `POST` | `/payments/refund` | Host / Admin | Initiate a full or partial refund for a captured payment |
+| `POST` | `/payments/:id/refund` | Host / Admin | Initiate a full or partial refund for a captured payment |
 | `GET` | `/payments/my` | Guest | View paginated payment transactions for current user |
 | `GET` | `/payments/booking/:bookingId` | Authenticated | Get payment records associated with a booking |
 | `GET` | `/payments/:id` | Authenticated | Get single payment details by UUID |

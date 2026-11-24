@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import app from "../src/app.js";
 import pool from "../src/database/pool.js";
+import { env } from "../src/config/env.js";
 
 let server;
 let baseUrl;
@@ -234,5 +236,50 @@ test.describe("Auth Module Integration Tests", () => {
       headers: { Authorization: "Bearer invalid.token.payload" },
     });
     assert.strictEqual(res.status, 401);
+  });
+
+  test("GET /auth/me - Rejects suspended user holding valid token with 403 Forbidden", async () => {
+    const suspendedEmail = `suspended_jwt_${uniqueId}@example.com`;
+    const hash = await bcrypt.hash(testPassword, 10);
+    const insRes = await pool.query(
+      `INSERT INTO users (full_name, email, password_hash, role, account_status)
+       VALUES ($1, $2, $3, 'guest', 'suspended') RETURNING id`,
+      ["Suspended User", suspendedEmail, hash]
+    );
+    const suspendedId = insRes.rows[0].id;
+    createdUserIds.push(suspendedId);
+
+    const suspendedJwt = jwt.sign(
+      { sub: suspendedId, email: suspendedEmail, role: "guest" },
+      env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    const res = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${suspendedJwt}` },
+    });
+
+    const body = await res.json();
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(body.success, false);
+    assert.match(body.message, /suspended/i);
+  });
+
+  test("POST /auth/login - Applies dedicated auth rate limiting headers", async () => {
+    const res = await fetch(`${baseUrl}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: testEmail,
+        password: testPassword,
+      }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const hasRateLimit =
+      res.headers.has("ratelimit") ||
+      res.headers.has("ratelimit-limit") ||
+      res.headers.has("ratelimit-policy");
+    assert.ok(hasRateLimit, "Auth response must include rate limit header");
   });
 });
