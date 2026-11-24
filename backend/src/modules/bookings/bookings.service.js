@@ -626,3 +626,193 @@ export const updateBookingStatus = async (bookingId, newStatus, user, { reason }
   const updateRes = await pool.query(updateSql, updateParams);
   return formatBookingRow(updateRes.rows[0]);
 };
+
+/**
+ * Authoritatively calculate booking price and breakdown across multi-duration rate plans.
+ */
+export const calculatePricingService = async (params) => {
+  const roomTypeId = params.room_type_id || params.roomTypeId || params.property_id || params.propertyId;
+  const durationType = (params.duration_type || params.durationType || "MONTHLY").toUpperCase();
+  const startDateStr = params.start_date || params.startDate || new Date().toISOString().split("T")[0];
+  const startTimeStr = params.start_time || params.startTime || "10:00";
+  const durationCount = Number(params.duration_count || params.durationCount || 1);
+  const includeFood = Boolean(params.include_food ?? params.includeFood ?? false);
+
+  if (!roomTypeId) {
+    const error = new Error("roomTypeId or propertyId is required");
+    error.status = 400;
+    throw error;
+  }
+
+  // 1. Try to find authoritative rate plan in PostgreSQL
+  const query = `
+    SELECT 
+      rp.id as rate_plan_id,
+      rp.duration_type,
+      rp.price,
+      rp.is_enabled,
+      rp.min_duration,
+      rp.max_duration,
+      rp.allowed_hours_start,
+      rp.allowed_hours_end,
+      rp.deposit_amount,
+      rp.food_monthly_charge,
+      rp.electricity_rule,
+      rp.notes,
+      rt.id as room_type_id,
+      rt.name as room_type_name,
+      rt.category,
+      p.id as property_id,
+      p.title as property_title,
+      p.price_per_night,
+      p.currency
+    FROM rate_plans rp
+    JOIN room_types rt ON rp.room_type_id = rt.id
+    JOIN properties p ON rt.property_id = p.id
+    WHERE (rt.id = $1 OR rt.property_id = $1 OR p.id = $1)
+      AND rp.duration_type = $2
+      AND rp.is_enabled = true
+    ORDER BY rp.created_at ASC
+    LIMIT 1;
+  `;
+
+  let res = await pool.query(query, [roomTypeId, durationType]);
+  let row = res.rows[0];
+
+  // 2. Fallback to property base rate if room_types or explicit rate_plans don't exist
+  if (!row) {
+    const propRes = await pool.query(
+      "SELECT id, title, price_per_night, currency FROM properties WHERE id = $1 LIMIT 1",
+      [roomTypeId]
+    );
+    const prop = propRes.rows[0];
+    if (prop) {
+      const pricePerNight = Number.parseFloat(prop.price_per_night) || 1000;
+      let price = pricePerNight;
+      let deposit = 0;
+      if (durationType === "HOURLY") {
+        price = Math.max(100, Math.round(pricePerNight / 10));
+      } else if (durationType === "DAILY") {
+        price = pricePerNight;
+        deposit = 500;
+      } else if (durationType === "WEEKLY") {
+        price = Math.max(2500, Math.round(pricePerNight * 6));
+        deposit = 2000;
+      } else if (durationType === "MONTHLY") {
+        price = Math.max(8000, Math.round(pricePerNight * 25));
+        deposit = Math.round(price * 0.5);
+      } else if (durationType === "YEARLY") {
+        price = Math.max(90000, Math.round(pricePerNight * 250));
+        deposit = Math.round(price * 0.1);
+      }
+
+      row = {
+        rate_plan_id: null,
+        duration_type: durationType,
+        price,
+        is_enabled: true,
+        min_duration: 1,
+        max_duration: null,
+        allowed_hours_start: "08:00",
+        allowed_hours_end: "22:00",
+        deposit_amount: deposit,
+        food_monthly_charge: 3000,
+        electricity_rule: "Included in rent",
+        notes: null,
+        room_type_id: null,
+        room_type_name: prop.title,
+        property_id: prop.id,
+        property_title: prop.title,
+        price_per_night: pricePerNight,
+        currency: prop.currency || "INR",
+      };
+    }
+  }
+
+  if (!row) {
+    const error = new Error(`Duration "${durationType}" is not offered for this room or property.`);
+    error.status = 404;
+    throw error;
+  }
+
+  const unitPrice = Number(row.price);
+  const depositAmount = Number(row.deposit_amount || 0);
+  const foodMonthlyCharge = Number(row.food_monthly_charge || 0);
+  const baseAmount = Number((unitPrice * durationCount).toFixed(2));
+
+  let foodCharge = 0;
+  if (includeFood && foodMonthlyCharge > 0) {
+    if (durationType === "MONTHLY") {
+      foodCharge = Number((foodMonthlyCharge * durationCount).toFixed(2));
+    } else if (durationType === "DAILY") {
+      foodCharge = Number(((foodMonthlyCharge / 30) * durationCount).toFixed(2));
+    } else if (durationType === "WEEKLY") {
+      foodCharge = Number(((foodMonthlyCharge / 4) * durationCount).toFixed(2));
+    } else if (durationType === "YEARLY") {
+      foodCharge = Number((foodMonthlyCharge * 12 * durationCount).toFixed(2));
+    }
+  }
+
+  const taxes = Number(((baseAmount + foodCharge) * 0.12).toFixed(2));
+  const totalAmount = Number((baseAmount + foodCharge + taxes + depositAmount).toFixed(2));
+
+  // Calculate start and end date
+  const [year, month, day] = startDateStr.split("-").map(Number);
+  const [hour, minute] = startTimeStr.split(":").map(Number);
+  const startDateTime = new Date(year, (month || 1) - 1, day || 1, hour || 10, minute || 0, 0);
+  let endDateTime = new Date(startDateTime);
+
+  if (durationType === "HOURLY") {
+    endDateTime.setHours(endDateTime.getHours() + durationCount);
+  } else if (durationType === "DAILY") {
+    endDateTime.setDate(endDateTime.getDate() + durationCount);
+  } else if (durationType === "WEEKLY") {
+    endDateTime.setDate(endDateTime.getDate() + durationCount * 7);
+  } else if (durationType === "MONTHLY") {
+    endDateTime.setMonth(endDateTime.getMonth() + durationCount);
+  } else if (durationType === "YEARLY") {
+    endDateTime.setFullYear(endDateTime.getFullYear() + durationCount);
+  }
+
+  const breakdown = {
+    unitLabel:
+      durationType === "HOURLY"
+        ? "/ hour"
+        : durationType === "DAILY"
+        ? "/ day"
+        : durationType === "WEEKLY"
+        ? "/ week"
+        : durationType === "MONTHLY"
+        ? "/ month"
+        : "/ year",
+    unitPrice,
+    durationCount,
+    durationType,
+    baseAmount,
+    foodCharge,
+    taxes,
+    depositAmount,
+    totalAmount,
+    payableNow: totalAmount,
+    balanceRemaining: 0,
+    startDateTime: startDateTime.toISOString(),
+    endDateTime: endDateTime.toISOString(),
+    currency: row.currency || "INR",
+  };
+
+  const ratePlan = {
+    id: row.rate_plan_id,
+    durationType: row.duration_type,
+    price: unitPrice,
+    minDuration: Number(row.min_duration || 1),
+    maxDuration: row.max_duration ? Number(row.max_duration) : null,
+    allowedHoursStart: row.allowed_hours_start || "08:00",
+    allowedHoursEnd: row.allowed_hours_end || "22:00",
+    depositAmount,
+    foodMonthlyCharge,
+    electricityRule: row.electricity_rule || "Included in rent",
+    notes: row.notes || null,
+  };
+
+  return { breakdown, ratePlan };
+};

@@ -29,7 +29,7 @@ export function StayzyLogo({
   return (
     <div className={`inline-flex items-center gap-2 select-none cursor-pointer group ${className}`}>
       <img
-        src="/stayzy-logo.png"
+        src="/stayzy-logo-hd.png"
         alt="Stayzy Logo"
         className={`${heightClass} w-auto object-contain drop-shadow-md transition-transform duration-200 group-hover:scale-[1.03]`}
         loading="eager"

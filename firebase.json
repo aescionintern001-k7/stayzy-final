@@ -1,0 +1,105 @@
+{
+  "hosting": {
+    "public": "frontend/out",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "headers": [
+      {
+        "source": "/api/**",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/api/rooms",
+        "destination": "/api/rooms.json"
+      },
+      {
+        "source": "/api/content",
+        "destination": "/api/content.json"
+      },
+      {
+        "source": "/api/admin/payments",
+        "destination": "/api/admin/payments.json"
+      },
+      {
+        "source": "/api/admin/bookings",
+        "destination": "/api/admin/bookings.json"
+      },
+      {
+        "source": "/api/admin/properties",
+        "destination": "/api/admin/properties.json"
+      },
+      {
+        "source": "/api/admin/visits",
+        "destination": "/api/admin/visits.json"
+      },
+      {
+        "source": "/api/admin/support",
+        "destination": "/api/admin/support.json"
+      },
+      {
+        "source": "/api/admin/stats",
+        "destination": "/api/admin/stats.json"
+      },
+      {
+        "source": "/api/admin/users",
+        "destination": "/api/admin/users.json"
+      },
+      {
+        "source": "/api/owner/properties",
+        "destination": "/api/owner/properties.json"
+      },
+      {
+        "source": "/api/owner/visits",
+        "destination": "/api/owner/visits.json"
+      },
+      {
+        "source": "/api/owner/bookings",
+        "destination": "/api/owner/bookings.json"
+      },
+      {
+        "source": "/api/admin/rates",
+        "destination": "/api/admin/rates.json"
+      },
+      {
+        "source": "/api/admin/customers",
+        "destination": "/api/admin/customers.json"
+      },
+      {
+        "source": "/api/bookings/my",
+        "destination": "/api/bookings/my.json"
+      },
+      {
+        "source": "/api/payments/my",
+        "destination": "/api/payments/my.json"
+      },
+      {
+        "source": "/api/visits/my",
+        "destination": "/api/visits/my.json"
+      },
+      {
+        "source": "/api/auth/me",
+        "destination": "/api/auth/me.json"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

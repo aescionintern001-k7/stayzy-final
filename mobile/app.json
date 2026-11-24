@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Stayzy",
+    "slug": "stazy",
+    "owner": "karthick_s",
+    "version": "1.0.1",
+    "orientation": "default",
+    "icon": "./assets/stayzy-logo.png",
+    "scheme": "stayzy",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/stayzy-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stayzy.app",
+      "infoPlist": {
+        "UIRequiresFullScreen": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/stayzy-logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.stayzy.app",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/stayzy-logo.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-router"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "7b0fa184-f1dc-4dd7-8268-0fdd1953ae63"
+      }
+    }
+  }
+}

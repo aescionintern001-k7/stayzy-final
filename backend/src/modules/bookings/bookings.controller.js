@@ -6,6 +6,7 @@ import {
   getBookingById as getBookingByIdService,
   cancelBooking as cancelBookingService,
   updateBookingStatus as updateBookingStatusService,
+  calculatePricingService,
 } from "./bookings.service.js";
 
 /**
@@ -141,6 +142,26 @@ export const updateBookingStatus = async (req, res, next) => {
       success: true,
       message: "Booking status updated successfully",
       data: { booking },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/v1/bookings/calculate-pricing
+ * GET /api/v1/bookings/calculate-pricing
+ * Authoritatively calculate booking pricing and rate plan breakdown.
+ */
+export const calculatePricing = async (req, res, next) => {
+  try {
+    const params = req.method === "GET" ? req.query : req.body;
+    const result = await calculatePricingService(params);
+
+    res.status(200).json({
+      success: true,
+      message: "Pricing calculated successfully",
+      data: result,
     });
   } catch (error) {
     next(error);

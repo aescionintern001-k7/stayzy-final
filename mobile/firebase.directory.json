@@ -1,0 +1,23 @@
+{
+  "firestore": {
+    "rules": "directory.rules"
+  },
+  "functions": {
+    "source": "functions",
+    "codebase": "stayzy-mobile"
+  },
+  "hosting": {
+    "target": "stayzy-admin",
+    "public": "admin-dist",
+    "ignore": [
+      "firebase.directory.json",
+      "**/.*"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

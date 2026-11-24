@@ -17,14 +17,60 @@ export async function POST(request: Request) {
       guestEmail,
     } = body;
 
-    const ratePlan = await prisma.ratePlan.findUnique({
-      where: {
-        roomTypeId_durationType: {
-          roomTypeId,
-          durationType: durationType as string,
+    let ratePlan: any = null;
+    try {
+      ratePlan = await prisma.ratePlan.findUnique({
+        where: {
+          roomTypeId_durationType: {
+            roomTypeId,
+            durationType: durationType as string,
+          },
         },
-      },
-    });
+      });
+    } catch {
+      ratePlan = null;
+    }
+
+    if (!ratePlan || !ratePlan.isEnabled) {
+      const BACKEND_URL =
+        process.env.API_BASE_URL ||
+        process.env.NEXT_PUBLIC_API_BASE_URL ||
+        process.env.NEXT_PUBLIC_BACKEND_API_URL ||
+        "http://localhost:5000/api/v1";
+
+      try {
+        const propRes = await fetch(`${BACKEND_URL}/properties/${roomTypeId}`, { cache: "no-store" });
+        if (propRes.ok) {
+          const propData = await propRes.json();
+          const property = propData.data?.property || propData.data;
+          const rts = property?.room_types || [];
+          for (const rt of rts) {
+            const plan = (rt.rate_plans || []).find(
+              (rp: any) => rp.duration_type === durationType && rp.is_enabled !== false
+            );
+            if (plan) {
+              ratePlan = {
+                id: plan.id,
+                durationType: plan.duration_type,
+                price: Number(plan.price),
+                depositAmount: Number(plan.deposit_amount || 0),
+                foodMonthlyCharge: Number(plan.food_monthly_charge || 0),
+                minDuration: Number(plan.min_duration || 1),
+                maxDuration: plan.max_duration ? Number(plan.max_duration) : null,
+                isEnabled: plan.is_enabled ?? true,
+                allowedHoursStart: plan.allowed_hours_start || "08:00",
+                allowedHoursEnd: plan.allowed_hours_end || "22:00",
+                electricityRule: plan.electricity_rule || "Included in rent",
+                notes: plan.notes || null,
+              };
+              break;
+            }
+          }
+        }
+      } catch {
+        // Fallback failed
+      }
+    }
 
     if (!ratePlan || !ratePlan.isEnabled) {
       return NextResponse.json(

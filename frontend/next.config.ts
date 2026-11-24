@@ -4,8 +4,6 @@ import path from "path";
 const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["@prisma/client", "prisma"],
-  // Disable development overlay indicator ("Insight" / prerender badge)
-  devIndicators: false,
   typescript: {
     ignoreBuildErrors: true,
   },

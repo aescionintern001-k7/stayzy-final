@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_DEMO_MODE": "true",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAjUnuYLvCGfYJEqQ7unkYxAmWbDrwhy6E",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "pg-rooms-60c83.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "pg-rooms-60c83",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "pg-rooms-60c83.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "27796929578",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:27796929578:web:c9018be5ea6e29db88d753"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

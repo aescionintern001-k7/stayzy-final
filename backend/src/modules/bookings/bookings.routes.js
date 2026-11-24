@@ -9,6 +9,7 @@ import {
   getBooking,
   cancelBooking,
   updateBookingStatus,
+  calculatePricing,
 } from "./bookings.controller.js";
 import {
   createBookingSchema,
@@ -27,6 +28,10 @@ router.get(
   validateRequest({ query: checkAvailabilityQuerySchema }),
   checkAvailability
 );
+
+// Public: Authoritative multi-duration pricing calculation
+router.post("/calculate-pricing", calculatePricing);
+router.get("/calculate-pricing", calculatePricing);
 
 // Authenticated: Create a booking
 router.post(

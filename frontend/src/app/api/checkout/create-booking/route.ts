@@ -57,17 +57,84 @@ export async function POST(request: Request) {
     }
 
     // 2. Fetch roomType and property
-    const roomType = await prisma.roomType.findUnique({
-      where: { id: roomTypeId },
-      include: {
-        property: true,
-        ratePlans: {
-          where: { durationType: durationType as string },
+    let roomType: any = null;
+    try {
+      roomType = await prisma.roomType.findUnique({
+        where: { id: roomTypeId },
+        include: {
+          property: true,
+          ratePlans: {
+            where: { durationType: durationType as string },
+          },
         },
-      },
-    });
+      });
+    } catch {
+      roomType = null;
+    }
 
-    if (!roomType || !roomType.ratePlans[0]) {
+    if (!roomType || !roomType.ratePlans?.[0]) {
+      const BACKEND_URL =
+        process.env.API_BASE_URL ||
+        process.env.NEXT_PUBLIC_API_BASE_URL ||
+        process.env.NEXT_PUBLIC_BACKEND_API_URL ||
+        "http://localhost:5000/api/v1";
+
+      try {
+        const propRes = await fetch(`${BACKEND_URL}/properties/${roomTypeId}`, { cache: "no-store" });
+        if (propRes.ok) {
+          const propData = await propRes.json();
+          const property = propData.data?.property || propData.data;
+          if (property) {
+            const rts = property.room_types || [];
+            let matchedPlan: any = null;
+            let matchedRt: any = null;
+            for (const rt of rts) {
+              const plan = (rt.rate_plans || []).find(
+                (rp: any) => rp.duration_type === durationType && rp.is_enabled !== false
+              );
+              if (plan) {
+                matchedPlan = plan;
+                matchedRt = rt;
+                break;
+              }
+            }
+
+            if (matchedPlan) {
+              roomType = {
+                id: matchedRt?.id || property.id,
+                name: matchedRt?.name || property.title,
+                propertyId: property.id,
+                maxCapacity: matchedRt?.max_capacity || property.max_guests || 4,
+                property: {
+                  id: property.id,
+                  name: property.title,
+                },
+                ratePlans: [
+                  {
+                    id: matchedPlan.id,
+                    durationType: matchedPlan.duration_type,
+                    price: Number(matchedPlan.price),
+                    depositAmount: Number(matchedPlan.deposit_amount || 0),
+                    foodMonthlyCharge: Number(matchedPlan.food_monthly_charge || 0),
+                    minDuration: Number(matchedPlan.min_duration || 1),
+                    maxDuration: matchedPlan.max_duration ? Number(matchedPlan.max_duration) : null,
+                    isEnabled: matchedPlan.is_enabled ?? true,
+                    allowedHoursStart: matchedPlan.allowed_hours_start || "08:00",
+                    allowedHoursEnd: matchedPlan.allowed_hours_end || "22:00",
+                    electricityRule: matchedPlan.electricity_rule || "Included in rent",
+                    notes: matchedPlan.notes || null,
+                  },
+                ],
+              };
+            }
+          }
+        }
+      } catch {
+        // Fallback failed
+      }
+    }
+
+    if (!roomType || !roomType.ratePlans?.[0]) {
       return NextResponse.json(
         { error: "Selected room or rate plan could not be located." },
         { status: 404 }
