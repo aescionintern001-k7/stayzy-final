@@ -197,7 +197,37 @@ export const getPropertyById = async (propertyId, user = null) => {
     }
   }
 
-  return formatPropertyRow(row);
+  const formatted = formatPropertyRow(row);
+
+  try {
+    const rtRes = await pool.query(
+      `SELECT rt.*, 
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', rp.id,
+              'duration_type', rp.duration_type,
+              'price', rp.price,
+              'deposit_amount', rp.deposit_amount,
+              'food_monthly_charge', rp.food_monthly_charge,
+              'min_duration', rp.min_duration,
+              'max_duration', rp.max_duration,
+              'is_enabled', rp.is_enabled
+            )
+          ) FILTER (WHERE rp.id IS NOT NULL), '[]'
+        ) as rate_plans
+      FROM room_types rt
+      LEFT JOIN rate_plans rp ON rp.room_type_id = rt.id AND rp.is_enabled = true
+      WHERE rt.property_id = $1
+      GROUP BY rt.id`,
+      [propertyId]
+    );
+    formatted.room_types = rtRes.rows || [];
+  } catch (err) {
+    formatted.room_types = [];
+  }
+
+  return formatted;
 };
 
 /**
