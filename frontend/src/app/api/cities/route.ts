@@ -1,89 +1,124 @@
 import { NextResponse } from "next/server";
-import { A_TO_Z_CITIES, QuickCity } from "@/lib/cities-data";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const letter = searchParams.get("letter")?.toUpperCase();
     const search = searchParams.get("search")?.trim().toLowerCase();
-    const country = searchParams.get("country");
+    const countryCode = searchParams.get("country")?.toUpperCase();
     const popularOnly = searchParams.get("popular") === "true";
+    const hasProperties = searchParams.get("hasProperties") === "true";
 
-    // 1. Gather all cities
-    let allCities: (QuickCity & { id: string; slug: string; firstLetter: string; propertyCount: number })[] = [];
-    for (const [char, list] of Object.entries(A_TO_Z_CITIES)) {
-      for (const city of list) {
-        allCities.push({
-          ...city,
-          id: `${char}-${city.name.toLowerCase().replace(/\s+/g, "-")}`,
-          slug: city.name.toLowerCase().replace(/\s+/g, "-"),
-          firstLetter: char,
-          propertyCount: city.hasStays ? 8 : city.isPopular ? 3 : 0,
-        });
-      }
-    }
-
-    // 2. Filter
-    let filtered = allCities;
+    // Build base filter conditions
+    const whereConditions: any = {};
 
     if (letter && letter !== "ALL" && /^[A-Z]$/.test(letter)) {
-      filtered = filtered.filter((c) => c.firstLetter === letter);
+      whereConditions.firstLetter = letter;
     }
 
-    if (country && country !== "ALL") {
-      filtered = filtered.filter(
-        (c) => c.country.toLowerCase() === country.toLowerCase()
-      );
+    if (countryCode && countryCode !== "ALL") {
+      whereConditions.country = { code: countryCode };
     }
 
     if (popularOnly) {
-      filtered = filtered.filter((c) => c.isPopular);
+      whereConditions.isPopular = true;
     }
 
     if (search) {
-      filtered = filtered.filter(
-        (c) =>
-          c.name.toLowerCase().includes(search) ||
-          c.country.toLowerCase().includes(search) ||
-          (c.region && c.region.toLowerCase().includes(search))
-      );
+      whereConditions.OR = [
+        { name: { contains: search } },
+        { region: { name: { contains: search } } },
+        { country: { name: { contains: search } } },
+      ];
     }
 
-    // 3. Compute letter counts
+    if (hasProperties) {
+      whereConditions.properties = {
+        some: {},
+      };
+    }
+
+    // 1. Fetch filtered cities
+    const cities = await prisma.locationCity.findMany({
+      where: whereConditions,
+      include: {
+        country: {
+          select: { id: true, code: true, name: true },
+        },
+        region: {
+          select: { id: true, name: true, code: true },
+        },
+        _count: {
+          select: { properties: true },
+        },
+      },
+      orderBy: [
+        { name: "asc" },
+      ],
+    });
+
+    // 2. Compute letter counts (A-Z) for current country & search context
+    const letterCountBaseWhere: any = {};
+    if (countryCode && countryCode !== "ALL") {
+      letterCountBaseWhere.country = { code: countryCode };
+    }
+    if (search) {
+      letterCountBaseWhere.OR = [
+        { name: { contains: search } },
+        { region: { name: { contains: search } } },
+        { country: { name: { contains: search } } },
+      ];
+    }
+
+    const allMatchingForLetters = await prisma.locationCity.groupBy({
+      by: ["firstLetter"],
+      where: letterCountBaseWhere,
+      _count: { _all: true },
+    });
+
     const letterCounts: Record<string, number> = {};
     const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
     for (const char of ALPHABET) {
-      letterCounts[char] = (A_TO_Z_CITIES[char] || []).length;
+      letterCounts[char] = 0;
+    }
+    for (const item of allMatchingForLetters) {
+      if (item.firstLetter && letterCounts[item.firstLetter] !== undefined) {
+        letterCounts[item.firstLetter] = item._count._all;
+      }
     }
 
-    // 4. Distinct countries
-    const countryCounts: Record<string, number> = {};
-    for (const c of allCities) {
-      countryCounts[c.country] = (countryCounts[c.country] || 0) + 1;
-    }
-    const countries = Object.entries(countryCounts).map(([name, count]) => ({
-      id: name.toLowerCase().replace(/\s+/g, "-"),
-      code: name.slice(0, 2).toUpperCase(),
-      name,
-      cityCount: count,
-    }));
+    // 3. Get list of available countries with counts
+    const countriesWithCounts = await prisma.locationCountry.findMany({
+      include: {
+        _count: {
+          select: { cities: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
 
     return NextResponse.json({
       success: true,
-      total: filtered.length,
+      total: cities.length,
       currentLetter: letter || "ALL",
-      cities: filtered.map((c) => ({
+      cities: cities.map((c) => ({
         id: c.id,
         name: c.name,
         slug: c.slug,
         firstLetter: c.firstLetter,
-        country: { name: c.country, code: c.country.slice(0, 2).toUpperCase() },
-        region: c.region ? { name: c.region } : null,
-        propertyCount: c.propertyCount,
-        isPopular: !!c.isPopular,
+        country: c.country,
+        region: c.region,
+        propertyCount: c._count.properties,
+        isPopular: c.isPopular,
       })),
       letterCounts,
-      countries,
+      countries: countriesWithCounts.map((cn) => ({
+        id: cn.id,
+        code: cn.code,
+        name: cn.name,
+        cityCount: cn._count.cities,
+      })),
     });
   } catch (error: any) {
     console.error("Error in /api/cities:", error);
@@ -93,3 +128,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

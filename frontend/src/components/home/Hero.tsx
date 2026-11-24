@@ -54,7 +54,37 @@ export function Hero() {
 
   // City Mega Menu States
   const [activeCityLetter, setActiveCityLetter] = useState<string>("A");
-  const [cityQuickSearch, setCityQuickSearch] = useState<string>("");
+  const [cityQuickSearch, setCityQuickSearch] = useState<string>("" );
+
+  // Video background reference & autoplay management
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Enforce muted for universal browser autoplay compliance
+    video.muted = true;
+    video.defaultMuted = true;
+
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn("Autoplay was prevented by browser policy, fallback poster active:", err);
+      });
+    }
+
+    // Seamless loop without black flash
+    const handleEnded = () => {
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    };
+
+    video.addEventListener("ended", handleEnded);
+    return () => {
+      video.removeEventListener("ended", handleEnded);
+    };
+  }, []);
 
   const citiesForDisplay = React.useMemo(() => {
     if (cityQuickSearch.trim()) {
@@ -160,30 +190,54 @@ export function Hero() {
   return (
     <div className="relative w-full min-h-[780px] lg:min-h-[880px] flex flex-col justify-between overflow-hidden bg-[#0c130e] text-white">
       {/* ======================================================== */}
-      {/* 1. BACKGROUND PHOTOGRAPH & PRECISE GRADIENT OVERLAYS    */}
+      {/* 1. CINEMATIC VIDEO BACKGROUND & PRECISE GRADIENT OVERLAYS */}
       {/* ======================================================== */}
       <div className="absolute inset-0 w-full h-full pointer-events-none select-none overflow-hidden z-0">
-        {/* Crisp Luxury Living Room Background Image */}
+        {/* Crisp Luxury Living Room Underlay Poster Image (Zero-flash during load and loop) */}
         <img
-          src="/hero-bg.jpg"
-          alt="Stayzy Luxury Co-Living Penthouse"
-          className="w-full h-full object-cover object-right sm:object-center transform scale-[1.01]"
+          src="/videos/hero-poster-4k.jpg"
+          alt="Stayzy Luxury Co-Living Living Room"
+          className="absolute inset-0 w-full h-full object-cover object-center transform scale-[1.01]"
+          loading="eager"
+          decoding="sync"
         />
 
-        {/* Master Dark Left-to-Right Gradient Overlay (Exact Section H formula) */}
+        {/* Full-screen HTML5 Autoplay Looping Video (Uploaded Stayzy Hotel Commercial) */}
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          loop
+          playsInline
+          webkit-playsinline="true"
+          preload="auto"
+          poster="/videos/hero-poster-4k.jpg"
+          disablePictureInPicture
+          disableRemotePlayback
+          className="absolute inset-0 w-full h-full object-cover object-center transform scale-[1.01]"
+          aria-hidden="true"
+          tabIndex={-1}
+        >
+          <source
+            src="/videos/stayzy_hotel_commercial_scenes_1080p.mp4"
+            type="video/mp4"
+          />
+        </video>
+
+        {/* Master Dark Left-to-Right Gradient Overlay for Optimal Text Contrast */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "linear-gradient(90deg, rgba(12, 18, 13, 0.82) 0%, rgba(18, 20, 17, 0.60) 42%, rgba(18, 20, 17, 0.18) 100%)",
+              "linear-gradient(90deg, rgba(10, 16, 12, 0.85) 0%, rgba(12, 18, 14, 0.62) 42%, rgba(12, 18, 14, 0.22) 100%)",
           }}
         />
 
         {/* Top Vignette for Transparent Header & Navigation Legibility */}
-        <div className="absolute top-0 inset-x-0 h-44 bg-gradient-to-b from-black/75 via-black/35 to-transparent pointer-events-none" />
+        <div className="absolute top-0 inset-x-0 h-48 bg-gradient-to-b from-black/85 via-black/40 to-transparent pointer-events-none" />
 
         {/* Bottom Ambient Gradient for Seamless Organic Curve Integration */}
-        <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-t from-black/40 via-black/10 to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 inset-x-0 h-44 bg-gradient-to-t from-black/50 via-black/15 to-transparent pointer-events-none" />
       </div>
 
       {/* ======================================================== */}
@@ -832,7 +886,7 @@ export function Hero() {
         <div ref={searchBarRef} className="mt-8 lg:mt-10 max-w-[1310px]">
           <form
             onSubmit={handleSearchSubmit}
-            className="bg-white rounded-2xl p-2 sm:p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.30)] border border-white/60 flex flex-col md:flex-row items-stretch md:items-center gap-2 text-gray-800 transition-all"
+            className="bg-white rounded-2xl md:rounded-full p-2 sm:p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.35)] border border-white/80 flex flex-col md:flex-row items-stretch md:items-center gap-2 text-gray-800 transition-all"
           >
             {/* Field 1: Destination ("Where to?") */}
             <div className="flex-1 relative flex items-center gap-3 px-3 py-2">
@@ -881,7 +935,7 @@ export function Hero() {
                   setGuestPickerOpen(false);
                   setDestFocused(false);
                 }}
-                className="w-full md:w-auto flex items-center justify-between md:justify-start gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-[#00B86B] bg-[#F0FDF4] border border-[#00B86B] hover:bg-emerald-100/70 transition-colors cursor-pointer"
+                className="w-full md:w-auto flex items-center justify-between md:justify-start gap-2 px-4 py-2.5 rounded-xl md:rounded-full text-xs font-bold text-[#00B86B] bg-[#F0FDF4] border border-[#00B86B] hover:bg-emerald-100/70 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-1.5">
                   <Navigation className="w-3.5 h-3.5 text-[#00B86B]" />
@@ -1112,7 +1166,7 @@ export function Hero() {
             {/* Field 5: Large Bright Green Search Action Button */}
             <button
               type="submit"
-              className="px-8 py-3.5 rounded-xl bg-[#00B86B] hover:bg-[#00A35E] active:scale-95 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              className="px-8 py-3.5 rounded-xl md:rounded-full bg-[#00B86B] hover:bg-[#00A35E] active:scale-95 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
             >
               <Search className="w-4 h-4 stroke-[2.5]" />
               <span>Search</span>
@@ -1177,7 +1231,7 @@ export function Hero() {
         >
           {/* Exact Organic Curve: High on left, dips in center, slight rise on right */}
           <path
-            d="M0 45 C 320 90, 720 85, 1020 50 C 1220 28, 1360 40, 1440 60 L 1440 90 L 0 90 Z"
+            d="M0 25 C 240 25, 480 65, 800 80 C 1100 95, 1320 60, 1440 45 L 1440 90 L 0 90 Z"
             fill="#FFFFFF"
           />
         </svg>

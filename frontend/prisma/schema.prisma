@@ -39,6 +39,8 @@ model Property {
   timezone      String         @default("Asia/Kolkata")
   coverImage    String
   images        String         // JSON array of image URLs
+  locationCityId String?
+  locationCity   LocationCity?  @relation(fields: [locationCityId], references: [id], onDelete: SetNull)
   roomTypes     RoomType[]
   bookings      Booking[]
   visitRequests VisitRequest[]
@@ -283,4 +285,45 @@ model AuditLog {
   entityId   String?
   details    String?
   createdAt  DateTime @default(now())
+}
+
+model LocationCountry {
+  id        String           @id @default(cuid())
+  code      String           @unique // e.g. "IN", "US", "GB", "AE", etc.
+  name      String           @unique
+  regions   LocationRegion[]
+  cities    LocationCity[]
+  createdAt DateTime         @default(now())
+}
+
+model LocationRegion {
+  id        String          @id @default(cuid())
+  name      String
+  code      String?
+  countryId String
+  country   LocationCountry @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  cities    LocationCity[]
+  createdAt DateTime        @default(now())
+
+  @@unique([countryId, name])
+}
+
+model LocationCity {
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  countryId   String
+  country     LocationCountry @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  regionId    String?
+  region      LocationRegion? @relation(fields: [regionId], references: [id], onDelete: SetNull)
+  latitude    Float?
+  longitude   Float?
+  firstLetter String          // "A", "B", ... "Z"
+  isPopular   Boolean         @default(false)
+  properties  Property[]
+  createdAt   DateTime        @default(now())
+
+  @@index([firstLetter])
+  @@index([name])
+  @@index([countryId])
 }
