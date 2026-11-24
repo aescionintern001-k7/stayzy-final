@@ -279,7 +279,7 @@ export function Footer() {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
               <img
-                src="/stayzy-logo-hd.png"
+                src="/stayzy-logo.png"
                 alt="Stayzy Logo"
                 className="h-9 w-auto object-contain drop-shadow-md"
               />
