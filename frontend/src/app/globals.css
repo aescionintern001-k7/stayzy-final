@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-plus-jakarta-sans), var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  
+  --color-ivory: #FFFFFF;
+  --color-ivory-dark: #F9FAFB;
+  --color-forest: #123D2B;
+  --color-forest-hover: #0E2F21;
+  --color-forest-light: #1E543C;
+  --color-lime-accent: #E8F1D5;
+  --color-lime-hover: #DBE8C3;
+  --color-text-main: #111827;
+  --color-text-muted: #4B5563;
+  --color-card-border: #E5E7EB;
+  --color-warm-cream: #FDFCF9;
+  --color-warm-border: #D5D2C7;
+  --color-emerald-accent: #059669;
+  --color-amber-accent: #D97706;
+  --color-rose-accent: #E11D48;
+
+  /* Strict professional border radius: 5px to 10px */
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
+  --radius-4xl: 10px;
+}
+
+:root {
+  --background: #FFFFFF;
+  --foreground: #111827;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+  overflow-x: clip;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+/* Professional Design System: Enforce strict 5-10px border radius across platform */
+.rounded-3xl,
+.rounded-2xl {
+  border-radius: 8px !important;
+}
+
+.rounded-xl {
+  border-radius: 8px !important;
+}
+
+.rounded-lg {
+  border-radius: 8px !important;
+}
+
+.rounded-md {
+  border-radius: 6px !important;
+}
+
+.rounded-sm {
+  border-radius: 5px !important;
+}
+
+/* Badges, chips, tags - sleek rectangular with 5-6px radius (not bubbly pill shape) */
+span.rounded-full:not(.avatar):not(.status-dot):not(.indicator-dot),
+div.rounded-full:not(.avatar):not(.status-dot):not(.indicator-dot):not(.icon-circle),
+button.rounded-full:not(.icon-btn) {
+  border-radius: 6px !important;
+}
+
+/* Sleek inputs, buttons, and select dropdowns */
+button,
+input,
+select,
+textarea {
+  border-radius: 6px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FFFFFF;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D5D2C7;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8B4A5;
+}
+
+/* Professional Crisp Shadows */
+.shadow-card,
+.shadow-soft {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02) !important;
+}
+
+.shadow-card-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.shadow-card-hover:hover {
+  box-shadow: 0 6px 16px -2px rgba(18, 61, 43, 0.08), 0 2px 6px -1px rgba(18, 61, 43, 0.04) !important;
+}
+
+/* Badge styles */
+.badge-lime {
+  background-color: #FFFFFF;
+  color: #123D2B;
+  font-weight: 700;
+  border: 1px solid #D5D2C7;
+  border-radius: 6px !important;
+}
