@@ -29,6 +29,8 @@ const variantStyles: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-sm transition-all disabled:bg-rose-600/50",
   sage:
     "bg-[#1E543C] text-white hover:bg-[#123D2B] shadow-sm transition-all disabled:bg-[#1E543C]/50",
+  arrow:
+    "bg-[#009B70] text-white hover:bg-[#00834F] shadow-sm transition-all disabled:opacity-50",
 };
 
 const sizeStyles: Record<NonNullable<ButtonProps["size"]>, string> = {
