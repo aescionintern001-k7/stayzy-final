@@ -122,7 +122,7 @@ export function Hero() {
   ];
 
   return (
-    <div className="relative w-full min-h-[820px] lg:min-h-[900px] flex flex-col justify-between overflow-hidden bg-[#0c130e] text-white pt-24 sm:pt-28 lg:pt-32">
+    <div className="relative w-full min-h-[820px] lg:min-h-[920px] flex flex-col justify-between overflow-hidden bg-[#0c130e] text-white pt-32 sm:pt-36 lg:pt-40">
       {/* ======================================================== */}
       {/* 1. CINEMATIC VIDEO BACKGROUND & PRECISE GRADIENT OVERLAYS */}
       {/* ======================================================== */}
@@ -179,23 +179,6 @@ export function Hero() {
       {/* ======================================================== */}
       <main className="relative z-20 w-full max-w-[1480px] mx-auto px-4 sm:px-8 lg:px-12 pt-8 pb-16 lg:py-16 my-auto">
         <div className="max-w-3xl space-y-4 sm:space-y-5 text-left">
-          {/* Trust Value Badges Strip */}
-          <div className="inline-flex flex-wrap items-center gap-4 sm:gap-6 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-white/90 mb-1">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#00C875]" strokeWidth={2.2} />
-              <span>Verified Rooms</span>
-            </div>
-            <div className="w-px h-3.5 bg-white/20 hidden sm:block" />
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-[#00C875]" strokeWidth={2.2} />
-              <span>Best Prices</span>
-            </div>
-            <div className="w-px h-3.5 bg-white/20 hidden sm:block" />
-            <div className="flex items-center gap-2">
-              <Headphones className="w-4 h-4 text-[#00C875]" strokeWidth={2.2} />
-              <span>24/7 Support</span>
-            </div>
-          </div>
           {/* Main Headline (Exact screenshot line arrangement & colors) */}
           <h1 className="text-4xl sm:text-6xl lg:text-[72px] font-black text-white tracking-tight leading-[1.05] drop-shadow-lg font-sans">
             Smart, Comfortable <br />

@@ -5,41 +5,33 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
-  BedDouble,
-  GraduationCap,
-  Building2,
-  Users,
-  Settings,
-  MapPin,
-  LayoutGrid,
-  PlusCircle,
-  Phone,
-  Mail,
+  ShieldCheck,
+  BadgePercent,
+  Headphones,
   User,
   UserCheck,
-  Shield,
   ChevronDown,
   ChevronRight,
   Search,
   X,
   Menu,
-  ArrowRight,
-  Wifi,
+  Phone,
+  Mail,
+  MapPin,
   Sparkles,
-  Compass,
   Utensils,
+  Wifi,
+  Compass,
   CheckCircle2,
   HelpCircle,
   FileText,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { StayzyLogo } from "@/components/common/StayzyLogo";
-import { LiquidNavbar, LiquidNavItem } from "@/components/ui/liquid-glass-navbar";
 import { A_TO_Z_CITIES, QuickCity } from "@/lib/cities-data";
 
 export function Navbar() {
   const pathname = usePathname();
-  const isHomePage = pathname === "/";
   const router = useRouter();
   const toast = useToast();
 
@@ -50,22 +42,9 @@ export function Navbar() {
 
   // All Cities Mega Menu Search & Filter
   const [activeCityLetter, setActiveCityLetter] = useState<string>("A");
-  const [cityQuickSearch, setCityQuickSearch] = useState<string>("");
+  const [cityQuickSearch, setCityQuickSearch] = useState<string>("" );
 
   const navContainerRef = useRef<HTMLDivElement>(null);
-
-  // Determine active index for LiquidNavbar based on URL route
-  const activeNavIndex = useMemo(() => {
-    if (pathname === "/") return 0;
-    if (pathname.includes("HOSTEL")) return 2;
-    if (pathname.includes("FLAT")) return 3;
-    if (pathname.includes("SHARED")) return 4;
-    if (pathname.startsWith("/rooms")) return 1;
-    if (pathname === "/amenities") return 5;
-    if (pathname === "/cities") return 6;
-    if (pathname === "/faq" || pathname === "/about" || pathname === "/contact") return 7;
-    return 0;
-  }, [pathname]);
 
   // Detect current role from URL or localStorage
   useEffect(() => {
@@ -191,242 +170,454 @@ export function Navbar() {
     return A_TO_Z_CITIES[activeCityLetter] || [];
   }, [activeCityLetter, cityQuickSearch]);
 
-  // Liquid Navbar items with icons, liquid scenes, and routes
-  const liquidNavItems: LiquidNavItem[] = useMemo(
-    () => [
-      {
-        label: "Home",
-        href: "/",
-        icon: <Home className="w-3.5 h-3.5 text-white" />,
-        fx: "glow",
-      },
-      {
-        label: "PG & Rooms",
-        icon: <BedDouble className="w-3.5 h-3.5 text-white" />,
-        fx: "drop",
-        onClick: (e) => {
-          e.preventDefault();
-          toggleDropdown("rooms");
-        },
-      },
-      {
-        label: "Hostels",
-        href: "/rooms?category=HOSTEL",
-        icon: <GraduationCap className="w-3.5 h-3.5 text-white" />,
-        fx: "pop",
-      },
-      {
-        label: "Flats",
-        href: "/rooms?category=FLAT",
-        icon: <Building2 className="w-3.5 h-3.5 text-white" />,
-        fx: "plane",
-      },
-      {
-        label: "Shared Spaces",
-        icon: <Users className="w-3.5 h-3.5 text-white" />,
-        fx: "wave",
-        onClick: (e) => {
-          e.preventDefault();
-          toggleDropdown("shared");
-        },
-      },
-      {
-        label: "Services",
-        icon: <Settings className="w-3.5 h-3.5 text-white" />,
-        fx: "spin",
-        onClick: (e) => {
-          e.preventDefault();
-          toggleDropdown("services");
-        },
-      },
-      {
-        label: "All Cities",
-        icon: <MapPin className="w-3.5 h-3.5 text-[#00B981]" />,
-        fx: "pop",
-        onClick: (e) => {
-          e.preventDefault();
-          toggleDropdown("cities");
-        },
-      },
-      {
-        label: "More",
-        icon: <LayoutGrid className="w-3.5 h-3.5 text-white" />,
-        fx: "spin",
-        onClick: (e) => {
-          e.preventDefault();
-          toggleDropdown("more");
-        },
-      },
-    ],
-    []
-  );
+  const isHomeActive = pathname === "/";
 
   return (
     <>
       {/* 
         ========================================================================
-        PERMANENTLY FIXED LIQUID GLASS NAVBAR (Stayzy Emerald Edition)
-        - position: fixed; top: 0; left: 0; width: 100%; z-index: 50;
-        - WebGL liquid waterline shader with stretching droplet, ripples, meniscus
-        - Preserves dark translucent glassmorphism & Stayzy green palette
+        PERMANENTLY FIXED TRANSLUCENT NAVBAR & TOP FEATURES BAR
+        - Matches reference image exactly:
+          * Row 1: Logo, 3 Trust Badges (Verified, Prices, Support), Login, List Property
+          * Row 2: Home (underlined), PG & Rooms, Hostels, Flats, Shared Spaces, Services, More, All Cities
+        - Constant across video playback and scroll
         ========================================================================
       */}
-      <header className="fixed top-0 left-0 w-full z-50 pt-2.5 pb-2 px-3 sm:px-6 pointer-events-none select-none">
-        <div
-          ref={navContainerRef}
-          className="max-w-[1440px] mx-auto pointer-events-auto"
-        >
-          {/* Floating Dark Glassmorphism Rounded Capsule Container */}
-          <div className="relative bg-[#0c1410]/55 backdrop-blur-2xl rounded-full border border-white/15 shadow-[0_12px_45px_rgba(0,0,0,0.38)] px-3 sm:px-4 py-1.5 flex items-center justify-between">
-            {/* Subtle Ambient Mint/Emerald Glow on capsule tips */}
-            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#00B981]/20 via-[#009B70]/10 to-transparent rounded-l-full pointer-events-none -z-10" />
-            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#00B981]/20 via-[#009B70]/10 to-transparent rounded-r-full pointer-events-none -z-10" />
-
-            {/* ======================================================== */}
-            {/* 1. LEFT: STAYZY BRAND LOGO (Icon + White Wordmark)       */}
-            {/* ======================================================== */}
+      <header
+        ref={navContainerRef}
+        className="fixed top-0 left-0 w-full z-50 bg-[#08100c]/80 backdrop-blur-md border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)] transition-all select-none"
+      >
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          {/* ========================================================== */}
+          {/* ROW 1: BRAND LOGO + TOP TRUST FEATURES + AUTH & LIST BUTTON */}
+          {/* ========================================================== */}
+          <div className="h-16 flex items-center justify-between border-b border-white/10">
+            {/* Left: Brand Logo */}
             <Link
               href="/"
               onClick={closeAllMenus}
-              className="flex items-center gap-2 group shrink-0 select-none cursor-pointer pr-1 pl-1"
+              className="flex items-center gap-2 group shrink-0"
               aria-label="Stayzy Home"
             >
-              <StayzyLogo variant="light" size="sm" />
+              <StayzyLogo variant="light" size="md" />
             </Link>
 
-            {/* Translucent Vertical Divider */}
-            <div className="hidden xl:block h-5 w-px bg-white/20 mx-1 shrink-0" />
-
-            {/* ======================================================== */}
-            {/* 2. MIDDLE: LIQUID GLASS NAVBAR (WebGL Waterline Drop)    */}
-            {/* ======================================================== */}
-            <div className="hidden xl:flex items-center relative">
-              <LiquidNavbar
-                items={liquidNavItems}
-                active={activeNavIndex}
-                onChange={(index, item) => {
-                  if (item.href) {
-                    closeAllMenus();
-                    router.push(item.href);
-                  }
-                }}
-                tone="green"
-                sound={false}
-                className="bg-transparent! backdrop-blur-none! border-0! shadow-none! p-0"
-              />
-
-              {/* 2.1 PG & ROOMS Dropdown Menu */}
-              {activeDropdown === "rooms" && (
-                <div className="absolute top-full left-16 mt-3 w-72 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.5)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
-                    Room Accommodations
-                  </div>
-                  <Link
-                    href="/rooms?category=PG"
-                    onClick={closeAllMenus}
-                    className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
-                  >
-                    <span>All Verified PGs</span>
-                    <span className="text-[10px] text-emerald-300 bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">100% Verified</span>
-                  </Link>
-                  <Link
-                    href="/rooms?category=PRIVATE"
-                    onClick={closeAllMenus}
-                    className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    Private Single Occupancy Rooms
-                  </Link>
-                  <Link
-                    href="/rooms?category=TWIN_SHARING"
-                    onClick={closeAllMenus}
-                    className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    Twin Sharing (2 Beds with Attached Bath)
-                  </Link>
-                  <Link
-                    href="/rooms?category=TRIPLE_SHARING"
-                    onClick={closeAllMenus}
-                    className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    Triple Sharing Budget Spaces
-                  </Link>
-                  <Link
-                    href="/rooms?foodIncluded=true"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors border-t border-white/10 mt-1 pt-2"
-                  >
-                    <Utensils className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>PGs with Daily 3-Meal Dining</span>
-                  </Link>
+            {/* Middle: 3 Top Features / Trust Badges (Exact from Reference) */}
+            <div className="hidden lg:flex items-center gap-6 xl:gap-10">
+              {/* Feature 1: Verified Rooms */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-md flex items-center justify-center text-[#00B981] shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-[#00B981]" strokeWidth={2.3} />
                 </div>
-              )}
-
-              {/* 2.2 SHARED SPACES Dropdown Menu */}
-              {activeDropdown === "shared" && (
-                <div className="absolute top-full left-52 mt-3 w-68 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.5)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
-                    Co-Living &amp; Community
-                  </div>
-                  <Link
-                    href="/rooms?category=SHARED"
-                    onClick={closeAllMenus}
-                    className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
-                  >
-                    All Shared Living Spaces
-                  </Link>
-                  <Link
-                    href="/rooms?category=SHARED"
-                    onClick={closeAllMenus}
-                    className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    Tech Hub Executive Residences
-                  </Link>
-                  <Link
-                    href="/rooms?category=SHARED"
-                    onClick={closeAllMenus}
-                    className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    Student Friendly Co-Living Hubs
-                  </Link>
+                <div className="text-left leading-tight">
+                  <div className="text-xs font-bold text-white tracking-wide">Verified Rooms</div>
+                  <div className="text-[10px] text-white/70 font-medium">100% Verified Listings</div>
                 </div>
-              )}
+              </div>
 
-              {/* 2.3 SERVICES Dropdown Menu */}
-              {activeDropdown === "services" && (
-                <div className="absolute top-full left-72 mt-3 w-64 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.5)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
-                    Included Amenities
-                  </div>
-                  <Link
-                    href="/amenities"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>View All Services</span>
-                  </Link>
-                  <Link
-                    href="/amenities#wifi"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>300 Mbps Fiber Wi-Fi</span>
-                  </Link>
-                  <Link
-                    href="/amenities#food"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    <Utensils className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Chef-Prepared Meals</span>
-                  </Link>
+              {/* Feature 2: Best Prices */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-md flex items-center justify-center text-[#00B981] shrink-0">
+                  <BadgePercent className="w-5 h-5 text-[#00B981]" strokeWidth={2.3} />
                 </div>
-              )}
+                <div className="text-left leading-tight">
+                  <div className="text-xs font-bold text-white tracking-wide">Best Prices</div>
+                  <div className="text-[10px] text-white/70 font-medium">Save More, Live Better</div>
+                </div>
+              </div>
 
-              {/* 2.4 ALL CITIES Mega Menu */}
+              {/* Feature 3: 24/7 Support */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-md flex items-center justify-center text-[#00B981] shrink-0">
+                  <Headphones className="w-5 h-5 text-[#00B981]" strokeWidth={2.3} />
+                </div>
+                <div className="text-left leading-tight">
+                  <div className="text-xs font-bold text-white tracking-wide">24/7 Support</div>
+                  <div className="text-[10px] text-white/70 font-medium">We&apos;re Always Here</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Divider + Login/Signup + List Your Property Button */}
+            <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+              {/* Vertical subtle divider */}
+              <div className="hidden lg:block h-6 w-px bg-white/20 mx-1 shrink-0" />
+
+              {/* Login / Signup Button */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown("login")}
+                  className="flex items-center gap-2 text-white hover:text-emerald-400 font-semibold text-xs sm:text-[13px] py-1.5 px-2 rounded-lg transition-colors cursor-pointer group"
+                  aria-expanded={activeDropdown === "login"}
+                >
+                  <User className="w-4 h-4 text-white group-hover:text-emerald-400 transition-colors" />
+                  <span>Login / Signup</span>
+                  <ChevronDown
+                    className={`w-3 h-3 text-white/70 transition-transform duration-200 ${
+                      activeDropdown === "login" ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {/* Login / Access Portal Popover */}
+                {activeDropdown === "login" && (
+                  <div className="absolute right-0 mt-3 w-80 bg-[#0d1612]/98 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.6)] border border-white/15 p-3.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 border-b border-white/10 mb-2 flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-white/40">
+                        Select Access Portal
+                      </span>
+                      {currentRole && (
+                        <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                          {currentRole}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 1. Resident / Customer */}
+                    <button
+                      type="button"
+                      onClick={() => handleRoleLogin("CUSTOMER")}
+                      disabled={switching}
+                      className="w-full p-2.5 rounded-xl hover:bg-white/10 text-left transition-colors flex items-start gap-3 cursor-pointer group"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 group-hover:bg-[#00B981] group-hover:text-white transition-colors">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white group-hover:text-emerald-400">
+                            Resident Login
+                          </span>
+                          {currentRole === "CUSTOMER" && (
+                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-500/40">Active</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-white/60 leading-snug line-clamp-1">
+                          Bookings, Wi-Fi keys &amp; rent payments
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* 2. Property Owner */}
+                    <button
+                      type="button"
+                      onClick={() => handleRoleLogin("OWNER")}
+                      disabled={switching}
+                      className="w-full p-2.5 rounded-xl hover:bg-white/10 text-left transition-colors flex items-start gap-3 cursor-pointer group"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                        <Home className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white group-hover:text-amber-400">
+                            PG Host / Owner
+                          </span>
+                          {currentRole === "OWNER" && (
+                            <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-500/40">Active</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-white/60 leading-snug line-clamp-1">
+                          Occupancy, tenant dues &amp; rooms
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Standard Links */}
+                    <div className="mt-2.5 pt-2.5 border-t border-white/10 flex items-center justify-between px-2 text-xs">
+                      <Link
+                        href="/login"
+                        onClick={closeAllMenus}
+                        className="text-emerald-400 font-bold hover:underline"
+                      >
+                        Standard Login &rarr;
+                      </Link>
+                      <Link
+                        href="/register"
+                        onClick={closeAllMenus}
+                        className="text-white/70 hover:text-white font-medium"
+                      >
+                        Create Account
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* List Your Property Button (Exact Solid Green Pill Button with Home Icon) */}
+              <Link
+                href="/owner/properties/new"
+                onClick={closeAllMenus}
+                className="hidden sm:inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg bg-[#00B981] hover:bg-[#009B70] text-white font-bold text-xs sm:text-[13px] shadow-[0_2px_12px_rgba(0,185,129,0.35)] transition-all cursor-pointer group shrink-0"
+              >
+                <Home className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+                <span>List Your Property</span>
+              </Link>
+
+              {/* Mobile Menu Trigger */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="lg:hidden p-2 rounded-lg hover:bg-white/10 text-white transition-colors"
+                aria-label="Open Mobile Menu"
+              >
+                <Menu className="w-6 h-6 text-white" />
+              </button>
+            </div>
+          </div>
+
+          {/* ========================================================== */}
+          {/* ROW 2: BOTTOM NAVIGATION BAR (Home, PG & Rooms, Hostels...) */}
+          {/* ========================================================== */}
+          <nav className="hidden lg:flex items-center justify-between py-2.5 text-[13px] font-semibold text-white/90 relative">
+            <div className="flex items-center gap-6 xl:gap-8">
+              {/* 1. Home (With Green Underline Bar) */}
+              <Link
+                href="/"
+                onClick={closeAllMenus}
+                className={`flex items-center gap-1.5 transition-colors relative py-1 ${
+                  isHomeActive ? "text-white font-bold" : "text-white/85 hover:text-white"
+                }`}
+              >
+                <Home className="w-4 h-4 text-white" />
+                <span>Home</span>
+                {isHomeActive && (
+                  <div className="absolute -bottom-2.5 left-0 right-0 h-[2.5px] bg-[#00B981] rounded-full" />
+                )}
+              </Link>
+
+              {/* 2. PG & Rooms ⌄ */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown("rooms")}
+                  className="flex items-center gap-1 text-white/85 hover:text-white transition-colors cursor-pointer py-1"
+                >
+                  <span>PG &amp; Rooms</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                </button>
+
+                {/* PG & Rooms Dropdown */}
+                {activeDropdown === "rooms" && (
+                  <div className="absolute top-full left-0 mt-3 w-72 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.55)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
+                      Room Accommodations
+                    </div>
+                    <Link
+                      href="/rooms?category=PG"
+                      onClick={closeAllMenus}
+                      className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
+                    >
+                      <span>All Verified PGs</span>
+                      <span className="text-[10px] text-emerald-300 bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">100% Verified</span>
+                    </Link>
+                    <Link
+                      href="/rooms?category=PRIVATE"
+                      onClick={closeAllMenus}
+                      className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      Private Single Occupancy Rooms
+                    </Link>
+                    <Link
+                      href="/rooms?category=TWIN_SHARING"
+                      onClick={closeAllMenus}
+                      className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      Twin Sharing (2 Beds with Attached Bath)
+                    </Link>
+                    <Link
+                      href="/rooms?category=TRIPLE_SHARING"
+                      onClick={closeAllMenus}
+                      className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      Triple Sharing Budget Spaces
+                    </Link>
+                    <Link
+                      href="/rooms?foodIncluded=true"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors border-t border-white/10 mt-1 pt-2"
+                    >
+                      <Utensils className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>PGs with Daily 3-Meal Dining</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Hostels ⌄ */}
+              <Link
+                href="/rooms?category=HOSTEL"
+                onClick={closeAllMenus}
+                className="flex items-center gap-1 text-white/85 hover:text-white transition-colors py-1"
+              >
+                <span>Hostels</span>
+                <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+              </Link>
+
+              {/* 4. Flats ⌄ */}
+              <Link
+                href="/rooms?category=FLAT"
+                onClick={closeAllMenus}
+                className="flex items-center gap-1 text-white/85 hover:text-white transition-colors py-1"
+              >
+                <span>Flats</span>
+                <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+              </Link>
+
+              {/* 5. Shared Spaces ⌄ */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown("shared")}
+                  className="flex items-center gap-1 text-white/85 hover:text-white transition-colors cursor-pointer py-1"
+                >
+                  <span>Shared Spaces</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                </button>
+
+                {activeDropdown === "shared" && (
+                  <div className="absolute top-full left-0 mt-3 w-68 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.55)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
+                      Co-Living &amp; Community
+                    </div>
+                    <Link
+                      href="/rooms?category=SHARED"
+                      onClick={closeAllMenus}
+                      className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
+                    >
+                      All Shared Living Spaces
+                    </Link>
+                    <Link
+                      href="/rooms?category=SHARED"
+                      onClick={closeAllMenus}
+                      className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      Tech Hub Executive Residences
+                    </Link>
+                    <Link
+                      href="/rooms?category=SHARED"
+                      onClick={closeAllMenus}
+                      className="block px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      Student Friendly Co-Living Hubs
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* 6. Services ⌄ */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown("services")}
+                  className="flex items-center gap-1 text-white/85 hover:text-white transition-colors cursor-pointer py-1"
+                >
+                  <span>Services</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                </button>
+
+                {activeDropdown === "services" && (
+                  <div className="absolute top-full left-0 mt-3 w-64 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.55)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
+                      Included Amenities
+                    </div>
+                    <Link
+                      href="/amenities"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>View All Services</span>
+                    </Link>
+                    <Link
+                      href="/amenities#wifi"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>300 Mbps Fiber Wi-Fi</span>
+                    </Link>
+                    <Link
+                      href="/amenities#food"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      <Utensils className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Chef-Prepared Meals</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* 7. More ⌄ */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown("more")}
+                  className="flex items-center gap-1 text-white/85 hover:text-white transition-colors cursor-pointer py-1"
+                >
+                  <span>More</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                </button>
+
+                {activeDropdown === "more" && (
+                  <div className="absolute top-full left-0 mt-3 w-64 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.55)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
+                      Stayzy Resources
+                    </div>
+                    <Link
+                      href="/about"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>About Stayzy Living</span>
+                    </Link>
+                    <Link
+                      href="/faq"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Help Center &amp; FAQs</span>
+                    </Link>
+                    <Link
+                      href="/cancellation-policy"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Cancellation &amp; Refund</span>
+                    </Link>
+                    <Link
+                      href="/contact"
+                      onClick={closeAllMenus}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Contact Support</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 8. All Cities ⌄ (With MapPin Icon) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown("cities")}
+                className="flex items-center gap-1.5 text-white/90 hover:text-emerald-400 transition-colors cursor-pointer py-1"
+              >
+                <MapPin className="w-4 h-4 text-[#00B981]" />
+                <span className="font-semibold">All Cities</span>
+                <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+              </button>
+
+              {/* All Cities Mega Menu */}
               {activeDropdown === "cities" && (
-                <div className="absolute top-full -left-20 sm:-left-32 mt-3 w-[92vw] max-w-3xl bg-[#0d1612]/98 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.55)] border border-white/15 p-5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute top-full right-0 mt-3 w-[92vw] max-w-3xl bg-[#0d1612]/98 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.6)] border border-white/15 p-5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-white/10 gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
@@ -551,405 +742,134 @@ export function Navbar() {
                   </div>
                 </div>
               )}
-
-              {/* 2.5 MORE Dropdown Menu */}
-              {activeDropdown === "more" && (
-                <div className="absolute top-full right-0 mt-3 w-64 bg-[#0d1612]/95 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.5)] border border-white/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-white/40 uppercase tracking-wider border-b border-white/10 mb-1">
-                    Stayzy Resources
-                  </div>
-                  <Link
-                    href="/about"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white hover:text-emerald-400 font-bold text-xs transition-colors"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>About Stayzy Living</span>
-                  </Link>
-                  <Link
-                    href="/faq"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Help Center &amp; FAQs</span>
-                  </Link>
-                  <Link
-                    href="/cancellation-policy"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Cancellation &amp; Refund</span>
-                  </Link>
-                  <Link
-                    href="/contact"
-                    onClick={closeAllMenus}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-white/80 hover:text-emerald-400 font-semibold text-xs transition-colors"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Contact Support</span>
-                  </Link>
-                </div>
-              )}
             </div>
+          </nav>
+        </div>
 
-            {/* Translucent Vertical Divider */}
-            <div className="hidden lg:block h-5 w-px bg-white/20 mx-1 shrink-0" />
-
-            {/* ======================================================== */}
-            {/* 3. RIGHT: ACTIONS & CONTACT (List, Phone, Email, Login)  */}
-            {/* ======================================================== */}
-            <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-bold shrink-0">
-              {/* 3.1 LIST YOUR PROPERTY (Outlined Pill Button with Plus Icon) */}
-              <Link
-                href="/owner/properties/new"
-                onClick={closeAllMenus}
-                className="hidden lg:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#00B981] text-white bg-black/25 hover:bg-[#00B981]/20 transition-all group shrink-0"
-              >
-                <div className="w-4 h-4 rounded-full bg-[#00B981]/25 border border-[#00B981] flex items-center justify-center shrink-0">
-                  <PlusCircle className="w-3.5 h-3.5 text-[#00B981] group-hover:rotate-90 transition-transform duration-200" />
+        {/* ========================================================== */}
+        {/* MOBILE SLIDE-OUT MENU DRAWER                               */}
+        {/* ========================================================== */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <div className="fixed right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-[#0c1410] border-l border-white/15 p-5 flex flex-col justify-between overflow-y-auto text-white shadow-2xl">
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                  <StayzyLogo variant="light" size="sm" />
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <div className="text-[10px] font-extrabold leading-[11px] tracking-wide text-left uppercase text-white">
-                  <div>LIST YOUR</div>
-                  <div>PROPERTY</div>
-                </div>
-              </Link>
 
-              {/* Translucent Vertical Divider */}
-              <div className="hidden lg:block h-5 w-px bg-white/20 mx-0.5 shrink-0" />
-
-              {/* 3.2 DIRECT PHONE SUPPORT */}
-              <a
-                href="tel:+918884518010"
-                className="hidden lg:inline-flex items-center gap-1.5 px-1.5 py-1 text-white hover:text-emerald-400 transition-colors shrink-0 group"
-                title="Call Stayzy Support"
-              >
-                <Phone className="w-3.5 h-3.5 text-white/90 group-hover:text-emerald-400 transition-colors" />
-                <div className="text-[10px] font-bold leading-[11px] text-left">
-                  <div className="text-white/60 font-semibold">+91</div>
-                  <div className="text-white">8884518010</div>
-                </div>
-              </a>
-
-              {/* Translucent Vertical Divider */}
-              <div className="hidden xl:block h-5 w-px bg-white/20 mx-0.5 shrink-0" />
-
-              {/* 3.3 SUPPORT EMAIL */}
-              <a
-                href="mailto:support@stayzy.in"
-                className="hidden xl:inline-flex items-center gap-1.5 px-1.5 py-1 text-white hover:text-emerald-400 transition-colors shrink-0 group"
-                title="Email Stayzy Support"
-              >
-                <Mail className="w-3.5 h-3.5 text-white/90 group-hover:text-emerald-400 transition-colors" />
-                <div className="text-[10px] font-bold leading-[11px] text-left">
-                  <div className="text-white/60 font-semibold">support</div>
-                  <div className="text-white">@stayzy.in</div>
-                </div>
-              </a>
-
-              {/* Translucent Vertical Divider */}
-              <div className="hidden lg:block h-5 w-px bg-white/20 mx-0.5 shrink-0" />
-
-              {/* 3.4 LOGIN / SIGN UP (Solid Green Pill Button + Multi-Role Portal) */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => toggleDropdown("login")}
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#009B70] hover:bg-[#00B981] text-white shadow-xs transition-all cursor-pointer group shrink-0"
-                  aria-expanded={activeDropdown === "login"}
-                >
-                  <User className="w-3.5 h-3.5 text-white" />
-                  <div className="text-[10px] font-extrabold leading-[11px] tracking-wide text-left uppercase text-white">
-                    <div>LOGIN / SIGN</div>
-                    <div>UP</div>
+                {/* Mobile Features Strip */}
+                <div className="py-4 border-b border-white/10 space-y-3">
+                  <div className="flex items-center gap-2.5 text-xs">
+                    <ShieldCheck className="w-4 h-4 text-[#00B981]" />
+                    <span className="font-semibold text-white/90">Verified Rooms (100% Verified)</span>
                   </div>
-                  <ChevronDown
-                    className={`w-3 h-3 text-white/90 transition-transform duration-200 ${
-                      activeDropdown === "login" ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Login / Access Portal Popover */}
-                {activeDropdown === "login" && (
-                  <div className="absolute right-0 mt-3 w-76 bg-[#0d1612]/98 backdrop-blur-2xl text-white rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.55)] border border-white/15 p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="px-3 py-1.5 border-b border-white/10 mb-2 flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-white/40">
-                        Select Access Portal
-                      </span>
-                      {currentRole && (
-                        <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                          {currentRole}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 1. Resident / Customer */}
-                    <button
-                      type="button"
-                      onClick={() => handleRoleLogin("CUSTOMER")}
-                      disabled={switching}
-                      className="w-full p-2.5 rounded-xl hover:bg-white/10 text-left transition-colors flex items-start gap-3 cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 group-hover:bg-[#00B981] group-hover:text-white transition-colors">
-                        <UserCheck className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white group-hover:text-emerald-400">
-                            Resident Login
-                          </span>
-                          {currentRole === "CUSTOMER" && (
-                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-500/40">Active</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-white/60 leading-snug line-clamp-1">
-                          Bookings, Wi-Fi keys &amp; rent payments
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* 2. Property Owner */}
-                    <button
-                      type="button"
-                      onClick={() => handleRoleLogin("OWNER")}
-                      disabled={switching}
-                      className="w-full p-2.5 rounded-xl hover:bg-white/10 text-left transition-colors flex items-start gap-3 cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white group-hover:text-amber-400">
-                            PG Host / Owner
-                          </span>
-                          {currentRole === "OWNER" && (
-                            <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-500/40">Active</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-white/60 leading-snug line-clamp-1">
-                          List PGs, monitor beds &amp; payouts
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* 3. Super Admin */}
-                    <button
-                      type="button"
-                      onClick={() => handleRoleLogin("ADMIN")}
-                      disabled={switching}
-                      className="w-full p-2.5 rounded-xl hover:bg-white/10 text-left transition-colors flex items-start gap-3 cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-slate-500/10 border border-slate-500/30 flex items-center justify-center text-slate-300 shrink-0 group-hover:bg-slate-700 group-hover:text-white transition-colors">
-                        <Shield className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white group-hover:text-slate-200">
-                            Super Admin Console
-                          </span>
-                          {currentRole === "ADMIN" && (
-                            <span className="text-[10px] font-bold text-slate-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-500/40">Active</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-white/60 leading-snug line-clamp-1">
-                          Operations, users &amp; pricing control
-                        </p>
-                      </div>
-                    </button>
-
-                    <div className="pt-2 border-t border-white/10 mt-2 flex justify-between px-2">
-                      <Link
-                        href="/login"
-                        onClick={closeAllMenus}
-                        className="text-emerald-400 hover:underline font-bold text-[11px]"
-                      >
-                        Standard Sign In &rarr;
-                      </Link>
-                      <Link
-                        href="/register"
-                        onClick={closeAllMenus}
-                        className="text-white/70 hover:text-white hover:underline font-bold text-[11px]"
-                      >
-                        Create Account
-                      </Link>
-                    </div>
+                  <div className="flex items-center gap-2.5 text-xs">
+                    <BadgePercent className="w-4 h-4 text-[#00B981]" />
+                    <span className="font-semibold text-white/90">Best Prices (Save More)</span>
                   </div>
-                )}
+                  <div className="flex items-center gap-2.5 text-xs">
+                    <Headphones className="w-4 h-4 text-[#00B981]" />
+                    <span className="font-semibold text-white/90">24/7 Support (Always Here)</span>
+                  </div>
+                </div>
+
+                {/* Mobile Navigation Links */}
+                <div className="py-4 space-y-2 border-b border-white/10 text-sm">
+                  <Link
+                    href="/"
+                    onClick={closeAllMenus}
+                    className="flex items-center gap-2.5 py-2 px-3 rounded-lg bg-white/5 text-white font-bold"
+                  >
+                    <Home className="w-4 h-4 text-[#00B981]" />
+                    <span>Home</span>
+                  </Link>
+                  <Link
+                    href="/rooms?category=PG"
+                    onClick={closeAllMenus}
+                    className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/5 text-white/90"
+                  >
+                    <span>PG &amp; Rooms</span>
+                    <span className="text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full font-bold">Verified</span>
+                  </Link>
+                  <Link
+                    href="/rooms?category=HOSTEL"
+                    onClick={closeAllMenus}
+                    className="block py-2 px-3 rounded-lg hover:bg-white/5 text-white/90"
+                  >
+                    Hostels
+                  </Link>
+                  <Link
+                    href="/rooms?category=FLAT"
+                    onClick={closeAllMenus}
+                    className="block py-2 px-3 rounded-lg hover:bg-white/5 text-white/90"
+                  >
+                    Flats
+                  </Link>
+                  <Link
+                    href="/rooms?category=SHARED"
+                    onClick={closeAllMenus}
+                    className="block py-2 px-3 rounded-lg hover:bg-white/5 text-white/90"
+                  >
+                    Shared Spaces
+                  </Link>
+                  <Link
+                    href="/amenities"
+                    onClick={closeAllMenus}
+                    className="block py-2 px-3 rounded-lg hover:bg-white/5 text-white/90"
+                  >
+                    Services &amp; Amenities
+                  </Link>
+                  <Link
+                    href="/cities"
+                    onClick={closeAllMenus}
+                    className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-white/5 text-white/90"
+                  >
+                    <MapPin className="w-4 h-4 text-[#00B981]" />
+                    <span>All Cities</span>
+                  </Link>
+                </div>
+
+                {/* Mobile Direct Action: List Your Property */}
+                <div className="py-4">
+                  <Link
+                    href="/owner/properties/new"
+                    onClick={closeAllMenus}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#00B981] hover:bg-[#009B70] text-white font-bold text-sm shadow-md"
+                  >
+                    <Home className="w-4 h-4" />
+                    <span>List Your Property</span>
+                  </Link>
+                </div>
               </div>
 
-              {/* 3.5 MOBILE MENU TOGGLE (Hamburger Icon) */}
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="xl:hidden p-2 rounded-full hover:bg-white/10 text-white cursor-pointer transition-colors"
-                aria-label="Toggle navigation menu"
-                aria-expanded={mobileMenuOpen}
-              >
-                {mobileMenuOpen ? (
-                  <X className="w-5 h-5 text-emerald-400" />
-                ) : (
-                  <Menu className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* ======================================================== */}
-          {/* 4. RESPONSIVE MOBILE SLIDE-OUT DRAWER                    */}
-          {/* ======================================================== */}
-          {mobileMenuOpen && (
-            <div className="xl:hidden mt-2 rounded-3xl bg-[#0c1410]/95 backdrop-blur-2xl border border-white/15 shadow-[0_25px_60px_rgba(0,0,0,0.6)] p-4 sm:p-5 text-white space-y-4 animate-in slide-in-from-top-3 duration-200">
-              {/* Quick Grid Links with Lucide Icons */}
-              <div className="grid grid-cols-2 gap-2 pb-3 border-b border-white/10">
-                <Link
-                  href="/"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 hover:text-emerald-400 text-xs font-bold text-white transition-colors"
-                >
-                  <Home className="w-4 h-4 text-emerald-400" />
-                  <span>Home</span>
-                </Link>
-                <Link
-                  href="/rooms?category=PG"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 hover:text-emerald-400 text-xs font-bold text-white transition-colors"
-                >
-                  <BedDouble className="w-4 h-4 text-emerald-400" />
-                  <span>PG &amp; Rooms</span>
-                </Link>
-                <Link
-                  href="/rooms?category=HOSTEL"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 hover:text-emerald-400 text-xs font-bold text-white transition-colors"
-                >
-                  <GraduationCap className="w-4 h-4 text-emerald-400" />
-                  <span>Hostels</span>
-                </Link>
-                <Link
-                  href="/rooms?category=FLAT"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 hover:text-emerald-400 text-xs font-bold text-white transition-colors"
-                >
-                  <Building2 className="w-4 h-4 text-emerald-400" />
-                  <span>Flats</span>
-                </Link>
-                <Link
-                  href="/rooms?category=SHARED"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 hover:text-emerald-400 text-xs font-bold text-white transition-colors"
-                >
-                  <Users className="w-4 h-4 text-emerald-400" />
-                  <span>Shared Spaces</span>
-                </Link>
-                <Link
-                  href="/amenities"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 hover:text-emerald-400 text-xs font-bold text-white transition-colors"
-                >
-                  <Settings className="w-4 h-4 text-emerald-400" />
-                  <span>Services</span>
-                </Link>
-                <Link
-                  href="/cities"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs font-bold text-emerald-300 transition-colors"
-                >
-                  <MapPin className="w-4 h-4 text-emerald-400" />
-                  <span>All Cities</span>
-                </Link>
-                <Link
-                  href="/faq"
-                  onClick={closeAllMenus}
-                  className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 hover:text-emerald-400 text-xs font-bold text-white transition-colors"
-                >
-                  <LayoutGrid className="w-4 h-4 text-emerald-400" />
-                  <span>More FAQs</span>
-                </Link>
-              </div>
-
-              {/* List Your Property & Contact Details */}
-              <div className="flex flex-col space-y-2 pb-3 border-b border-white/10">
-                <Link
-                  href="/owner/properties/new"
-                  onClick={closeAllMenus}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-[#00B981]/15 border border-[#00B981]/30 text-xs font-extrabold text-emerald-300"
-                >
-                  <span className="flex items-center gap-2">
-                    <PlusCircle className="w-4 h-4 text-emerald-400" />
-                    List Your Property
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-emerald-400" />
-                </Link>
-
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <a
-                    href="tel:+918884518010"
-                    className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 text-[11px] font-bold text-white"
-                  >
+              {/* Mobile Drawer Footer: Direct Contacts & Role Switch */}
+              <div className="pt-4 border-t border-white/10 space-y-3">
+                <div className="flex items-center justify-between text-xs text-white/70">
+                  <a href="tel:+918884518010" className="flex items-center gap-1.5 hover:text-emerald-400">
                     <Phone className="w-3.5 h-3.5 text-emerald-400" />
                     <span>+91 8884518010</span>
                   </a>
-                  <a
-                    href="mailto:support@stayzy.in"
-                    className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 text-[11px] font-bold text-white"
-                  >
+                  <a href="mailto:support@stayzy.in" className="flex items-center gap-1.5 hover:text-emerald-400">
                     <Mail className="w-3.5 h-3.5 text-emerald-400" />
                     <span>support@stayzy.in</span>
                   </a>
                 </div>
               </div>
-
-              {/* Mobile Fast Role Switcher */}
-              <div className="space-y-1.5 pt-1">
-                <div className="text-[10px] font-extrabold uppercase text-white/40 tracking-wider px-1">
-                  Direct Portal Access
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRoleLogin("CUSTOMER")}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white"
-                >
-                  <span className="flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-emerald-400" />
-                    Resident Login (Aarav)
-                  </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-white/40" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRoleLogin("OWNER")}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white"
-                >
-                  <span className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-amber-400" />
-                    Property Host Login (Rajesh)
-                  </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-white/40" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRoleLogin("ADMIN")}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white"
-                >
-                  <span className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-slate-300" />
-                    Super Admin Console
-                  </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-white/40" />
-                </button>
-              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </header>
-
-      {/* Spacer for non-home pages so content is not covered by the fixed navbar */}
-      {!isHomePage && (
-        <div className="h-20 sm:h-22 shrink-0 pointer-events-none" aria-hidden="true" />
-      )}
     </>
   );
 }
