@@ -1,4 +1,4 @@
-﻿import dotenv from "dotenv";
+import dotenv from "dotenv";
 import { z } from "zod";
 
 dotenv.config();
@@ -18,6 +18,9 @@ const envSchema = z.object({
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
   DB_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  RAZORPAY_KEY_ID: z.string().default("rzp_test_stayzykey123"),
+  RAZORPAY_KEY_SECRET: z.string().default("rzp_test_secret_stayzy456"),
+  RAZORPAY_WEBHOOK_SECRET: z.string().default("rzp_webhook_secret_stayzy789"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
