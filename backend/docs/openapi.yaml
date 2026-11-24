@@ -1,0 +1,896 @@
+openapi: 3.0.3
+info:
+  title: Stayzy API
+  description: Modern accommodation rental platform backend API built with Node.js, Express 5, and PostgreSQL 17.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter your JWT Bearer token obtained from /auth/login or /auth/register
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation completed successfully
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Error description
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        role:
+          type: string
+          enum: [guest, host, admin]
+          example: guest
+        account_status:
+          type: string
+          enum: [active, suspended]
+          example: active
+        phone:
+          type: string
+          nullable: true
+        profile_image_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Property:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        host_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Seaside Villa
+        description:
+          type: string
+          example: Beautiful beachfront villa with private pool
+        property_type:
+          type: string
+          enum: [apartment, house, villa, condo, cottage, cabin, studio, chalet, other]
+          example: villa
+        room_type:
+          type: string
+          enum: [entire_place, private_room, shared_room, hotel_room]
+          example: entire_place
+        price_per_night:
+          type: number
+          format: float
+          example: 250.00
+        currency:
+          type: string
+          example: USD
+        address:
+          type: string
+          example: 10 Ocean Blvd
+        city:
+          type: string
+          example: Miami
+        country:
+          type: string
+          example: USA
+        max_guests:
+          type: integer
+          example: 6
+        bedrooms:
+          type: integer
+          example: 3
+        beds:
+          type: integer
+          example: 4
+        bathrooms:
+          type: number
+          example: 2.5
+        amenities:
+          type: array
+          items:
+            type: string
+          example: [wifi, pool, kitchen, air_conditioning]
+        images:
+          type: array
+          items:
+            type: string
+          example: ["https://example.com/image1.jpg"]
+        status:
+          type: string
+          enum: [active, inactive, archived, draft]
+          example: active
+        is_available:
+          type: boolean
+          example: true
+        average_rating:
+          type: number
+          example: 4.85
+        reviews_count:
+          type: integer
+          example: 12
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        property_id:
+          type: string
+          format: uuid
+        guest_id:
+          type: string
+          format: uuid
+        check_in_date:
+          type: string
+          format: date
+          example: "2026-12-01"
+        check_out_date:
+          type: string
+          format: date
+          example: "2026-12-05"
+        total_nights:
+          type: integer
+          example: 4
+        price_per_night:
+          type: number
+          example: 250.00
+        total_price:
+          type: number
+          example: 1000.00
+        currency:
+          type: string
+          example: USD
+        guests_count:
+          type: integer
+          example: 2
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed]
+          example: confirmed
+        payment_status:
+          type: string
+          enum: [unpaid, paid, failed, refunded]
+          example: paid
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        booking_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        razorpay_order_id:
+          type: string
+          example: order_ABC123456789
+        razorpay_payment_id:
+          type: string
+          nullable: true
+          example: pay_XYZ987654321
+        amount:
+          type: number
+          example: 1000.00
+        currency:
+          type: string
+          example: USD
+        status:
+          type: string
+          enum: [created, captured, failed, refunded]
+          example: captured
+        refund_amount:
+          type: number
+          example: 0.00
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        booking_id:
+          type: string
+          format: uuid
+        property_id:
+          type: string
+          format: uuid
+        guest_id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        title:
+          type: string
+          nullable: true
+          example: Wonderful stay!
+        comment:
+          type: string
+          example: The place was clean, modern, and in a fantastic location.
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name, email, password]
+              properties:
+                full_name:
+                  type: string
+                  example: Jane Doe
+                email:
+                  type: string
+                  format: email
+                  example: jane@example.com
+                password:
+                  type: string
+                  format: password
+                  example: SecurePass123!
+                role:
+                  type: string
+                  enum: [guest, host]
+                  default: guest
+      responses:
+        201:
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        400:
+          description: Validation error
+        409:
+          description: Email already registered
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate user credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: jane@example.com
+                password:
+                  type: string
+                  format: password
+                  example: SecurePass123!
+      responses:
+        200:
+          description: Login successful with JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        401:
+          description: Invalid email or password
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get token profile
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Profile retrieved
+        401:
+          description: Unauthorized
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current authenticated user profile
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    patch:
+      tags: [Users]
+      summary: Update current user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  example: Jane Smith
+                phone:
+                  type: string
+                  example: "+1234567890"
+                profile_image_url:
+                  type: string
+                  example: "https://example.com/avatar.jpg"
+      responses:
+        200:
+          description: Profile updated successfully
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Admin list users with pagination and filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [guest, host, admin]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of users
+        403:
+          description: Forbidden (Admin only)
+
+  /properties:
+    get:
+      tags: [Properties]
+      summary: Search and filter public property listings
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: country
+          in: query
+          schema:
+            type: string
+        - name: property_type
+          in: query
+          schema:
+            type: string
+        - name: min_price
+          in: query
+          schema:
+            type: number
+        - name: max_price
+          in: query
+          schema:
+            type: number
+        - name: guests
+          in: query
+          schema:
+            type: integer
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [price_asc, price_desc, newest, rating]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: Paginated search results
+    post:
+      tags: [Properties]
+      summary: Create a new property listing (Host only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, price_per_night, address, city, country]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                property_type:
+                  type: string
+                  default: apartment
+                room_type:
+                  type: string
+                  default: entire_place
+                price_per_night:
+                  type: number
+                currency:
+                  type: string
+                  default: USD
+                address:
+                  type: string
+                city:
+                  type: string
+                country:
+                  type: string
+                max_guests:
+                  type: integer
+                  default: 1
+                bedrooms:
+                  type: integer
+                  default: 1
+                beds:
+                  type: integer
+                  default: 1
+                bathrooms:
+                  type: number
+                  default: 1.0
+                amenities:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        201:
+          description: Property listing created
+
+  /properties/{id}:
+    get:
+      tags: [Properties]
+      summary: Get property listing details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Property details
+        404:
+          description: Property not found
+    patch:
+      tags: [Properties]
+      summary: Update property listing (Host/Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Property updated
+    delete:
+      tags: [Properties]
+      summary: Delete property listing (Host/Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Property deleted
+
+  /properties/{propertyId}/reviews:
+    get:
+      tags: [Reviews]
+      summary: Get public reviews for a property
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest, highest_rating, lowest_rating]
+            default: newest
+      responses:
+        200:
+          description: Paginated reviews with rating distribution
+        404:
+          description: Property not found
+
+  /bookings:
+    post:
+      tags: [Bookings]
+      summary: Create a booking reservation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [property_id, check_in_date, check_out_date]
+              properties:
+                property_id:
+                  type: string
+                  format: uuid
+                check_in_date:
+                  type: string
+                  format: date
+                  example: "2026-12-01"
+                check_out_date:
+                  type: string
+                  format: date
+                  example: "2026-12-05"
+                guests_count:
+                  type: integer
+                  default: 1
+                special_requests:
+                  type: string
+      responses:
+        201:
+          description: Booking created successfully
+        400:
+          description: Invalid dates or exceeds guest capacity
+        409:
+          description: Dates already booked (concurrency conflict)
+    get:
+      tags: [Bookings]
+      summary: Get authenticated guest's booking history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, cancelled, completed]
+      responses:
+        200:
+          description: Paginated booking history
+
+  /bookings/availability:
+    get:
+      tags: [Bookings]
+      summary: Check property date availability
+      parameters:
+        - name: property_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: check_in_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: check_out_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        200:
+          description: Availability status and booked intervals
+
+  /bookings/{id}/cancel:
+    post:
+      tags: [Bookings]
+      summary: Cancel a reservation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cancellation_reason:
+                  type: string
+      responses:
+        200:
+          description: Booking cancelled
+
+  /payments/create-order:
+    post:
+      tags: [Payments]
+      summary: Create Razorpay payment order for booking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_id]
+              properties:
+                booking_id:
+                  type: string
+                  format: uuid
+      responses:
+        201:
+          description: Payment order created
+        400:
+          description: Booking cancelled or already paid
+
+  /payments/verify:
+    post:
+      tags: [Payments]
+      summary: Verify HMAC-SHA256 signature and capture payment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [razorpay_order_id, razorpay_payment_id, razorpay_signature]
+              properties:
+                razorpay_order_id:
+                  type: string
+                razorpay_payment_id:
+                  type: string
+                razorpay_signature:
+                  type: string
+      responses:
+        200:
+          description: Payment captured successfully
+        400:
+          description: Signature verification failed
+
+  /payments/{id}/refund:
+    post:
+      tags: [Payments]
+      summary: Process refund for captured payment (Host/Admin/Guest)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                reason:
+                  type: string
+      responses:
+        200:
+          description: Refund processed
+
+  /reviews:
+    post:
+      tags: [Reviews]
+      summary: Submit a review for a completed stay
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_id, rating, comment]
+              properties:
+                booking_id:
+                  type: string
+                  format: uuid
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                title:
+                  type: string
+                comment:
+                  type: string
+                  minLength: 5
+                  maxLength: 2000
+      responses:
+        201:
+          description: Review created and property rating updated
+        400:
+          description: Stay not completed or invalid rating
+        409:
+          description: Booking already reviewed
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Get platform overview statistics
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Platform statistics
+        403:
+          description: Forbidden (Admin only)
+
+  /admin/properties/{id}/status:
+    patch:
+      tags: [Admin]
+      summary: Moderate property status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [active, inactive, archived]
+                moderation_note:
+                  type: string
+      responses:
+        200:
+          description: Property status updated
+
+  /admin/reports/revenue:
+    get:
+      tags: [Admin]
+      summary: Financial revenue and refund analytics report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: interval
+          in: query
+          schema:
+            type: string
+            enum: [day, month]
+            default: day
+      responses:
+        200:
+          description: Revenue time-series report

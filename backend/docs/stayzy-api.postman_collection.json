@@ -1,0 +1,326 @@
+{
+  "info": {
+    "name": "Stayzy Backend API",
+    "description": "Comprehensive Postman collection for Stayzy vacation rental backend platform.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:5000/health"
+          }
+        },
+        {
+          "name": "API Welcome",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/register",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Guest\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123!\",\n  \"role\": \"guest\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Profile Token",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Current Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/users/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Johnathan Guest\",\n  \"phone\": \"+1234567890\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Admin List Users",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users?page=1&limit=10",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Properties",
+      "item": [
+        {
+          "name": "Search Properties",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/properties?city=Aspen&min_price=50&max_price=300"
+          }
+        },
+        {
+          "name": "Get Property Details",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/properties/:propertyId"
+          }
+        },
+        {
+          "name": "Create Property Listing",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/properties",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Cozy Mountain Chalet\",\n  \"description\": \"Scenic chalet with panoramic views and hot tub.\",\n  \"property_type\": \"chalet\",\n  \"room_type\": \"entire_place\",\n  \"price_per_night\": 220.00,\n  \"currency\": \"USD\",\n  \"address\": \"100 Mountain View Rd\",\n  \"city\": \"Aspen\",\n  \"country\": \"USA\",\n  \"max_guests\": 4,\n  \"bedrooms\": 2,\n  \"beds\": 2,\n  \"bathrooms\": 2.0,\n  \"amenities\": [\"wifi\", \"hot_tub\", \"fireplace\"]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Check Availability",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/availability?property_id=:propertyId&check_in_date=2026-12-01&check_out_date=2026-12-05"
+          }
+        },
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"property_id\": \"<property-uuid>\",\n  \"check_in_date\": \"2026-12-01\",\n  \"check_out_date\": \"2026-12-05\",\n  \"guests_count\": 2,\n  \"special_requests\": \"Late check-in\"\n}"
+            }
+          }
+        },
+        {
+          "name": "My Bookings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/my",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/:bookingId/cancel",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancellation_reason\": \"Change of travel schedule\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Payment Order",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/payments/create-order",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_id\": \"<booking-uuid>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify Payment Signature",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/payments/verify",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpay_order_id\": \"order_...\",\n  \"razorpay_payment_id\": \"pay_...\",\n  \"razorpay_signature\": \"...\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Process Refund",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/payments/:paymentId/refund",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00,\n  \"reason\": \"Partial refund agreement\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Get Property Reviews",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/properties/:propertyId/reviews"
+          }
+        },
+        {
+          "name": "Submit Review",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/reviews",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_id\": \"<booking-uuid>\",\n  \"rating\": 5,\n  \"title\": \"Unforgettable experience\",\n  \"comment\": \"Amazing place and wonderful hospitality!\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard Statistics",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/dashboard",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "Moderate Property",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/admin/properties/:propertyId/status",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\",\n  \"moderation_note\": \"Approved by compliance\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Revenue Financial Report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/reports/revenue?interval=day",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
