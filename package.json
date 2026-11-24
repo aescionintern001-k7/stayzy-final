@@ -1,0 +1,46 @@
+{
+  "name": "stayzy-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stayzy — Premium PG & Flexible Co-Living Platform (Frontend, Backend, Mobile)",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "mobile"
+  ],
+  "scripts": {
+    "install:frontend": "npm --prefix frontend install",
+    "install:backend": "npm --prefix backend install",
+    "install:mobile": "npm --prefix mobile install",
+    "install:all": "npm run install:frontend && npm run install:backend && npm run install:mobile",
+    "setup:frontend": "npm --prefix frontend install && npx --prefix frontend prisma generate --schema=./frontend/prisma/schema.prisma && npx --prefix frontend prisma db push --schema=./frontend/prisma/schema.prisma && npm --prefix frontend run seed",
+    "setup:backend": "npm --prefix backend install && npx --prefix backend prisma generate --schema=./backend/prisma/schema.prisma && npx --prefix backend prisma db push --schema=./backend/prisma/schema.prisma && npm --prefix backend run seed",
+    "setup": "npm run setup:frontend && npm run setup:backend",
+    "dev": "concurrently -k -n frontend,backend -c cyan.bold,green.bold \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:mobile": "npm --prefix mobile run start",
+    "dev:mobile:android": "npm --prefix mobile run android",
+    "dev:mobile:ios": "npm --prefix mobile run ios",
+    "dev:mobile:web": "npm --prefix mobile run web",
+    "seed:frontend": "npm --prefix frontend run seed",
+    "seed:backend": "npm --prefix backend run seed",
+    "seed:all": "npm run seed:frontend && npm run seed:backend",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:apk": "npm --prefix mobile run build:apk",
+    "build:apk:local": "npm --prefix mobile run build:apk:local",
+    "deploy:frontend": "firebase deploy --only hosting"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "protobufjs@7.6.6": true,
+    "prisma@6.19.3": true,
+    "@firebase/util@1.15.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
+}

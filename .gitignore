@@ -1,48 +1,57 @@
-# Node & Dependencies
+# dependencies
 node_modules/
-*/node_modules/
-package-lock.json.bak
+.pnp
+.pnp.*
 
-# Next.js Build Output
+# testing & coverage
+coverage/
+
+# next.js, react native & expo
 .next/
-*/.next/
 out/
-build/
+.expo/
 dist/
+build/
+admin-dist/
 
-# Environment Variables & Secrets
-.env
-.env.*
-!.env.example
-*.local
+# Android native build files
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+*.keystore
+!debug.keystore
 
-# Logs
+# misc
+.DS_Store
+*.pem
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-logs/
-*.log
+.pnpm-debug.log*
 
-# Testing & Coverage
-coverage/
-.nyc_output/
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
 
-# IDE & OS Files
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# SQLite databases
+# database
 *.db
+*.db-journal
 *.sqlite
-*.sqlite3
-prisma/*.db
 
-# TypeScript build info cache
+# firebase
+.firebase/
+firebase-debug*.log
+
+# typescript
 *.tsbuildinfo
+next-env.d.ts
+
+# mobile binaries
+*.apk
+*.aab
+.eas/

@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  match /stayzyContent/{section} {
+   allow read: if request.auth != null;
+   allow create, update: if section in ["home","help","contact","terms","privacy","cancellation"] && request.auth != null && request.auth.token.get('stayzyAdmin', false) == true &&
+    request.resource.data.keys().hasOnly(['title','description','revision']) &&
+    request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 90 &&
+    request.resource.data.description is string && request.resource.data.description.size() <= (section == "home" ? 220 : 6000) &&
+    request.resource.data.revision is int;
+  }
+  match /stayzyListings/{id} {
+   allow read: if request.auth != null && (resource.data.status == 'Approved' || (resource.data.ownerId == request.auth.uid && get(/databases/$(database)/documents/stayzyPeople/$(request.auth.uid)).data.role == "OWNER") || request.auth.token.get('stayzyAdmin',false));
+  }
+  match /stayzyRequests/{id} {
+   allow read: if request.auth != null && (resource.data.customerId == request.auth.uid || (resource.data.ownerId == request.auth.uid && get(/databases/$(database)/documents/stayzyPeople/$(request.auth.uid)).data.role == "OWNER") || request.auth.token.get('stayzyAdmin',false));
+  }
+  match /stayzyBookings/{id} {
+   allow read: if request.auth != null && (resource.data.customerId == request.auth.uid || (resource.data.ownerId == request.auth.uid && get(/databases/$(database)/documents/stayzyPeople/$(request.auth.uid)).data.role == "OWNER") || request.auth.token.get('stayzyAdmin',false));
+  }
+  match /stayzyPeople/{uid} {
+   function signed() { return request.auth != null; }
+   function admin() { return signed() && request.auth.token.get('stayzyAdmin', false) == true; }
+   function own() { return signed() && uid == request.auth.uid; }
+   function owner() { return signed() && get(/databases/$(database)/documents/stayzyPeople/$(request.auth.uid)).data.role == 'OWNER'; }
+   function valid() {
+    let p = request.resource.data;
+    return p.keys().hasOnly(['name','phone','email','role','ownerId','property']) &&
+     p.name is string && p.name.size() > 0 && p.name.size() <= 120 &&
+     p.phone is string && p.phone.size() <= 25 && p.email is string &&
+     p.role in ['OWNER','CUSTOMER'] && p.ownerId is string && p.property is string;
+   }
+   allow get, list: if own() || admin() || (owner() && resource.data.role == 'CUSTOMER' && resource.data.ownerId == request.auth.uid);
+   allow create: if own() && valid() && request.resource.data.role == 'CUSTOMER' && request.resource.data.ownerId == '' && request.resource.data.property == '' && request.resource.data.email == request.auth.token.email;
+   allow update: if valid() && ((admin() && (request.resource.data.ownerId == '' || (request.resource.data.role == 'CUSTOMER' && get(/databases/$(database)/documents/stayzyPeople/$(request.resource.data.ownerId)).data.role == 'OWNER'))) || (own() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone'])));
+  }
+ }
+}

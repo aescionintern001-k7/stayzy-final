@@ -1,0 +1,213 @@
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { prisma } from "./config/prisma.js";
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
+app.use(express.json());
+
+// Health Check
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "Stayzy Unified Backend API",
+    version: "1.0.0",
+    roles: ["CUSTOMER", "OWNER", "ADMIN"],
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// 1. PUBLIC & ROOMS API
+app.get("/api/rooms", async (req, res) => {
+  try {
+    const { city, category, gender } = req.query;
+    const where: any = {};
+    if (city && city !== "all") {
+      where.property = { city: String(city) };
+    }
+    if (category && category !== "all") {
+      where.category = String(category);
+    }
+    if (gender && gender !== "all") {
+      where.genderEligibility = String(gender);
+    }
+
+    const roomTypes = await prisma.roomType.findMany({
+      where,
+      include: {
+        property: true,
+        ratePlans: { where: { isEnabled: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const enriched = roomTypes.map((rt) => ({
+      ...rt,
+      images: JSON.parse(rt.images || "[]"),
+      keyAmenities: JSON.parse(rt.keyAmenities || "[]"),
+      currentRatePlan: rt.ratePlans.find((r) => r.durationType === "MONTHLY") || rt.ratePlans[0],
+      allRatePlans: rt.ratePlans,
+      isAvailable: true,
+      availableCount: 3,
+    }));
+
+    res.json({ success: true, count: enriched.length, rooms: enriched });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/rooms/:slug", async (req, res) => {
+  try {
+    const room = await prisma.roomType.findUnique({
+      where: { slug: req.params.slug },
+      include: {
+        property: true,
+        ratePlans: { where: { isEnabled: true } },
+      },
+    });
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: "Room not found" });
+    }
+
+    res.json({
+      success: true,
+      room: {
+        ...room,
+        images: JSON.parse(room.images || "[]"),
+        keyAmenities: JSON.parse(room.keyAmenities || "[]"),
+        allRatePlans: room.ratePlans,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 2. RESIDENT / CUSTOMER API
+app.get("/api/bookings/my", async (_req, res) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      include: {
+        roomType: true,
+        inventoryUnit: true,
+        payments: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+    res.json({ success: true, bookings });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/visits/schedule", async (req, res) => {
+  try {
+    const { propertyId, visitDate, visitTime, guestName, guestPhone, guestEmail } = req.body;
+    const visit = await prisma.visitRequest.create({
+      data: {
+        propertyId: propertyId || "cmvj3ablp0002lbe8p7i53b43",
+        preferredDate: new Date(visitDate || Date.now() + 86400000),
+        timeSlot: visitTime || "11:00 AM",
+        customerName: guestName || "Guest",
+        customerPhone: guestPhone || "+91 98765 43210",
+        customerEmail: guestEmail || "guest@stayzy.in",
+        status: "SCHEDULED",
+      },
+    });
+    res.json({ success: true, visit, message: "Property visit walkthrough scheduled successfully!" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. HOST / OWNER API
+app.get("/api/owner/properties", async (_req, res) => {
+  try {
+    const properties = await prisma.property.findMany({
+      include: {
+        roomTypes: {
+          include: {
+            ratePlans: true,
+            rooms: true,
+          },
+        },
+        visitRequests: true,
+      },
+    });
+    res.json({ success: true, properties });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 4. PLATFORM ADMIN API
+app.get("/api/admin/stats", async (_req, res) => {
+  try {
+    const [roomsCount, propertiesCount, bookingsCount, visitsCount] = await Promise.all([
+      prisma.roomType.count(),
+      prisma.property.count(),
+      prisma.booking.count(),
+      prisma.visitRequest.count(),
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        totalRooms: roomsCount,
+        totalProperties: propertiesCount,
+        totalBookings: bookingsCount,
+        pendingVisits: visitsCount,
+        realizedGMV: 485000,
+        platformCommission: 48500,
+        averageOccupancyRate: "91.4%",
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// 5. AUTH / DEMO ROLE SWITCHER
+app.post("/api/auth/switch", (req, res) => {
+  const { role } = req.body;
+  const roles: Record<string, any> = {
+    CUSTOMER: {
+      id: "demo-cust-1",
+      email: "aarav.sharma@example.com",
+      name: "Aarav Sharma",
+      role: "CUSTOMER",
+      token: "demo_token_customer",
+    },
+    OWNER: {
+      id: "demo-owner-1",
+      email: "rajesh.sharma@stayzy.in",
+      name: "Rajesh Sharma",
+      role: "OWNER",
+      token: "demo_token_owner",
+    },
+    ADMIN: {
+      id: "demo-admin-1",
+      email: "admin@stayzy.com",
+      name: "Lead Admin Vikramaditya",
+      role: "ADMIN",
+      token: "demo_token_admin",
+    },
+  };
+
+  const user = roles[role] || roles.CUSTOMER;
+  res.json({ success: true, user, message: `Switched role to ${user.role}` });
+});
+
+app.listen(PORT, () => {
+  console.log(`[Stayzy Backend API] Running on http://localhost:${PORT}`);
+  console.log(`[Stayzy Backend API] Ready to serve Web and Mobile Expo clients.`);
+});

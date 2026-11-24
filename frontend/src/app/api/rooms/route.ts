@@ -60,6 +60,7 @@ export async function GET(request: Request) {
             const adapted = backendPropertyToFrontendRoom(p);
             return {
               ...adapted,
+              // Match frontend category filter if requested
               isAvailable: p.is_available ?? true,
               availableCount: p.is_available ? 3 : 0,
             };
@@ -79,7 +80,8 @@ export async function GET(request: Request) {
         }
       }
     } catch (err) {
-      console.warn("[Rooms API] Express backend unavailable, checking local database");
+      // Backend not running or search query failed; fall through to local database
+      console.warn("[Rooms API] Express backend unavailable, falling back to local database");
     }
 
     // 2. Local database fallback
@@ -96,6 +98,7 @@ export async function GET(request: Request) {
           { city: { contains: city } },
           { address: { contains: city } },
           { state: { contains: city } },
+          { locationCity: { name: { contains: city } } },
         ],
       };
     }
@@ -145,7 +148,11 @@ export async function GET(request: Request) {
         },
       },
       include: {
-        property: true,
+        property: {
+          include: {
+            locationCity: true,
+          },
+        },
         ratePlans: {
           where: { isEnabled: true },
         },
@@ -154,7 +161,7 @@ export async function GET(request: Request) {
     });
 
     const enrichedRooms = await Promise.all(
-      roomTypes.map(async (rt: any) => {
+      roomTypes.map(async (rt) => {
         if (locality && locality !== "ALL") {
           const propNameAndAddr = `${rt.property.name} ${rt.property.address} ${rt.property.city}`.toLowerCase();
           if (!propNameAndAddr.includes(locality.toLowerCase())) {
@@ -162,7 +169,7 @@ export async function GET(request: Request) {
           }
         }
 
-        const activeRatePlan = rt.ratePlans.find((rp: any) => rp.durationType === durationType);
+        const activeRatePlan = rt.ratePlans.find((rp) => rp.durationType === durationType);
         if (!activeRatePlan) return null;
 
         const pricing = calculateBookingPricing({
@@ -263,16 +270,24 @@ export async function GET(request: Request) {
     let filtered = enrichedRooms.filter((r): r is NonNullable<typeof r> => r !== null);
 
     if (minBudget !== undefined) {
-      filtered = filtered.filter((r) => (r.pricing?.payableNow || 0) >= minBudget);
+      filtered = filtered.filter((r) => (r.pricing?.baseAmount || r.currentRatePlan.price) >= minBudget);
     }
     if (maxBudget !== undefined) {
-      filtered = filtered.filter((r) => (r.pricing?.payableNow || 0) <= maxBudget);
+      filtered = filtered.filter((r) => (r.pricing?.baseAmount || r.currentRatePlan.price) <= maxBudget);
     }
 
     if (sortBy === "price_asc") {
-      filtered.sort((a, b) => (a.pricing?.payableNow || 0) - (b.pricing?.payableNow || 0));
+      filtered.sort((a, b) => a.currentRatePlan.price - b.currentRatePlan.price);
     } else if (sortBy === "price_desc") {
-      filtered.sort((a, b) => (b.pricing?.payableNow || 0) - (a.pricing?.payableNow || 0));
+      filtered.sort((a, b) => b.currentRatePlan.price - a.currentRatePlan.price);
+    } else if (sortBy === "newest") {
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      filtered.sort((a, b) => {
+        if (a.availableCount > 0 && b.availableCount === 0) return -1;
+        if (a.availableCount === 0 && b.availableCount > 0) return 1;
+        return a.currentRatePlan.price - b.currentRatePlan.price;
+      });
     }
 
     return NextResponse.json({
@@ -282,10 +297,7 @@ export async function GET(request: Request) {
       source: "local_prisma",
     });
   } catch (error: any) {
-    console.error("Error fetching rooms:", error);
-    return NextResponse.json(
-      { error: "Failed to retrieve rooms.", details: error.message },
-      { status: 500 }
-    );
+    console.error("Error in /api/rooms:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
