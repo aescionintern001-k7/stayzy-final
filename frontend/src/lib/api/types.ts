@@ -102,6 +102,34 @@ export interface UpdateProfileDTO {
 // -------------------------------------------------------------
 // Property Types
 // -------------------------------------------------------------
+export interface BackendRatePlan {
+  id: string;
+  room_type_id: string;
+  duration_type: "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+  price: number | string;
+  deposit_amount?: number | string | null;
+  food_monthly_charge?: number | string | null;
+  min_duration?: number;
+  max_duration?: number;
+  is_enabled?: boolean;
+  cancellation_policy?: string | null;
+  created_at?: string;
+}
+
+export interface BackendRoomType {
+  id: string;
+  property_id: string;
+  name: string;
+  description?: string | null;
+  capacity: number;
+  size_sqft?: number | null;
+  bed_type?: string | null;
+  base_price: number | string;
+  amenities?: string[];
+  images?: string[];
+  rate_plans?: BackendRatePlan[];
+}
+
 export interface BackendProperty {
   id: string;
   host_id: string;
@@ -134,6 +162,7 @@ export interface BackendProperty {
   created_at: string;
   updated_at: string;
   host?: Partial<BackendUser>;
+  room_types?: BackendRoomType[];
 }
 
 export interface ListPropertiesQuery {

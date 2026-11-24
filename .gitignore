@@ -43,3 +43,6 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 prisma/*.db
+
+# TypeScript build info cache
+*.tsbuildinfo
