@@ -26,6 +26,9 @@ import {
   updateAvailabilitySchema,
   listPropertiesQuerySchema,
 } from "./properties.validator.js";
+import { getPropertyReviews } from "../reviews/reviews.controller.js";
+import { listPropertyReviewsQuerySchema } from "../reviews/reviews.validator.js";
+import { z } from "zod";
 
 const router = Router();
 
@@ -148,6 +151,16 @@ router.patch(
   authorize("host", "admin"),
   validateRequest({ params: propertyIdParamSchema, body: updateAvailabilitySchema }),
   updateAvailability
+);
+
+// Public: Get reviews for a property
+router.get(
+  "/:propertyId/reviews",
+  validateRequest({
+    params: z.object({ propertyId: z.string().uuid("Invalid property UUID") }),
+    query: listPropertyReviewsQuerySchema,
+  }),
+  getPropertyReviews
 );
 
 export default router;

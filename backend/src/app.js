@@ -20,6 +20,7 @@ import userRoutes from "./modules/users/users.routes.js";
 import propertyRoutes from "./modules/properties/properties.routes.js";
 import bookingRoutes from "./modules/bookings/bookings.routes.js";
 import paymentRoutes from "./modules/payments/payments.routes.js";
+import reviewRoutes from "./modules/reviews/reviews.routes.js";
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use(`${env.API_PREFIX}/users`, userRoutes);
 app.use(`${env.API_PREFIX}/properties`, propertyRoutes);
 app.use(`${env.API_PREFIX}/bookings`, bookingRoutes);
 app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
+app.use(`${env.API_PREFIX}/reviews`, reviewRoutes);
 
 // Health endpoint
 app.use(healthRoutes);
