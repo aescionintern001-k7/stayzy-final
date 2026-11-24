@@ -21,6 +21,7 @@ import propertyRoutes from "./modules/properties/properties.routes.js";
 import bookingRoutes from "./modules/bookings/bookings.routes.js";
 import paymentRoutes from "./modules/payments/payments.routes.js";
 import reviewRoutes from "./modules/reviews/reviews.routes.js";
+import adminRoutes from "./modules/admin/admin.routes.js";
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use(`${env.API_PREFIX}/properties`, propertyRoutes);
 app.use(`${env.API_PREFIX}/bookings`, bookingRoutes);
 app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
 app.use(`${env.API_PREFIX}/reviews`, reviewRoutes);
+app.use(`${env.API_PREFIX}/admin`, adminRoutes);
 
 // Health endpoint
 app.use(healthRoutes);
