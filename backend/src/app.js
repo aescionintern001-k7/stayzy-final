@@ -22,6 +22,14 @@ import bookingRoutes from "./modules/bookings/bookings.routes.js";
 import paymentRoutes from "./modules/payments/payments.routes.js";
 import reviewRoutes from "./modules/reviews/reviews.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yamljs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const openapiDocument = YAML.load(path.join(__dirname, "../docs/openapi.yaml"));
 
 const app = express();
 
@@ -53,6 +61,13 @@ app.use(`${env.API_PREFIX}/admin`, adminRoutes);
 
 // Health endpoint
 app.use(healthRoutes);
+
+// API Documentation (Swagger UI)
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiDocument));
+app.get("/api/docs/spec.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.json(openapiDocument);
+});
 
 // API root
 app.get(env.API_PREFIX, (req, res) => {
