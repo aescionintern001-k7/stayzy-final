@@ -3,15 +3,17 @@
 import React, { forwardRef } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArrowFillButton } from "./arrow-fill-button";
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "sage";
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "sage" | "arrow";
   size?: "xs" | "sm" | "md" | "lg";
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
+  arrowFill?: boolean;
 }
 
 const variantStyles: Record<NonNullable<ButtonProps["variant"]>, string> = {
@@ -47,11 +49,30 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       rightIcon,
       fullWidth = false,
       disabled,
+      arrowFill = false,
       children,
       ...props
     },
     ref
   ) => {
+    if (arrowFill || variant === "arrow") {
+      const arrowSize = size === "xs" || size === "sm" ? "sm" : size === "lg" ? "lg" : "md";
+      return (
+        <ArrowFillButton
+          as="button"
+          ref={ref as any}
+          disabled={disabled || isLoading}
+          size={arrowSize}
+          variant="primary"
+          leftIcon={isLoading ? <Loader2 className="w-4 h-4 animate-spin shrink-0 text-current" /> : leftIcon}
+          className={cn(fullWidth && "w-full", className)}
+          {...(props as any)}
+        >
+          {children}
+        </ArrowFillButton>
+      );
+    }
+
     return (
       <button
         ref={ref}

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { StayzyLogo } from "@/components/common/StayzyLogo";
+import { ArrowFillButton } from "@/components/ui/arrow-fill-button";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -200,13 +201,24 @@ export function Navbar() {
 
           {/* Right Action Bar (Zolo Screenshots 2 & 5: List Property, Phone, Email, Login) */}
           <div className="hidden md:flex items-center gap-6 text-xs font-bold text-gray-700">
-            {/* List Your Property */}
-            <Link
+            {/* List Your Property with ArrowFill Animation */}
+            <ArrowFillButton
+              as={Link}
               href="/owner/properties/new"
-              className="text-gray-700 hover:text-emerald-600 transition-colors font-extrabold uppercase tracking-wide"
-            >
-              List Your Property
-            </Link>
+              btnText="List Your Property"
+              leftIcon={<Building2 className="w-3.5 h-3.5" />}
+              variant="primary"
+              size="sm"
+              bgColor="#009B62"
+              textColor="#ffffff"
+              fillBgColor="#ffffff"
+              fillTextColor="#00834F"
+              hoverFillBgColor="#ffffff"
+              hoverFillTextColor="#00834F"
+              arrowColor="#00834F"
+              hoverArrowColor="#00834F"
+              className="font-extrabold text-xs uppercase tracking-wide border-[#009B62]"
+            />
 
             {/* Direct Phone Support */}
             <a

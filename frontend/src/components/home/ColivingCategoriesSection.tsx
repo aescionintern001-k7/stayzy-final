@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ArrowRight, Check, Home, Images, X, ChevronLeft, ChevronRight } from "lucide-react";
 import AccordionGallery, { GalleryItem } from "@/components/ui/AccordionGallery";
 import { AnimatedText } from "@/components/ui/animated-underline-text-one";
+import { ArrowFillButton } from "@/components/ui/arrow-fill-button";
 
 interface RoomCategory {
   id: string;
@@ -268,13 +269,22 @@ export function ColivingCategoriesSection() {
                     </span>{" "}
                     / mo
                   </div>
-                  <Link
+                  <ArrowFillButton
+                    as={Link}
                     href={`/rooms?category=${cat.categoryParam}`}
-                    className="inline-flex items-center gap-1.5 text-[14px] sm:text-[15px] font-bold text-[#009B62] hover:text-[#00834F] transition-colors"
-                  >
-                    <span>View Stays</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
+                    btnText="View Stays"
+                    variant="secondary"
+                    size="sm"
+                    bgColor="#F0FDF4"
+                    textColor="#009B62"
+                    fillBgColor="#009B62"
+                    fillTextColor="#ffffff"
+                    hoverFillBgColor="#00834F"
+                    hoverFillTextColor="#ffffff"
+                    arrowColor="#009B62"
+                    hoverArrowColor="#ffffff"
+                    className="text-[13px] font-bold border border-emerald-200/80 shadow-2xs hover:shadow-xs"
+                  />
                 </div>
               </div>
             );

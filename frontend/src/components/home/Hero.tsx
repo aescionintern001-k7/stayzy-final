@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import { StayzyLogo } from "@/components/common/StayzyLogo";
 import { A_TO_Z_CITIES, QuickCity } from "@/lib/cities-data";
+import { ArrowFillButton } from "@/components/ui/arrow-fill-button";
 
 export function Hero() {
   const router = useRouter();
@@ -348,14 +349,24 @@ export function Hero() {
               )}
             </div>
 
-            {/* Bright Emerald "List Your Property" Action Button */}
-            <Link
+            {/* Bright Emerald "List Your Property" Action Button with ArrowFill Animation */}
+            <ArrowFillButton
+              as={Link}
               href="/owner/properties/new"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00B86B] hover:bg-[#00A35E] active:scale-95 text-white font-extrabold text-[13px] shadow-md transition-all cursor-pointer"
-            >
-              <Home className="w-4 h-4 text-white" strokeWidth={2.2} />
-              <span>List Your Property</span>
-            </Link>
+              btnText="List Your Property"
+              leftIcon={<Home className="w-4 h-4" strokeWidth={2.2} />}
+              variant="emerald"
+              size="md"
+              bgColor="#00B86B"
+              textColor="#ffffff"
+              fillBgColor="#ffffff"
+              fillTextColor="#00834F"
+              hoverFillBgColor="#ffffff"
+              hoverFillTextColor="#00834F"
+              arrowColor="#00834F"
+              hoverArrowColor="#00834F"
+              className="text-[13px] font-extrabold shadow-md border-[#00B86B]"
+            />
           </div>
         </div>
 
@@ -1163,14 +1174,24 @@ export function Hero() {
               )}
             </div>
 
-            {/* Field 5: Large Bright Green Search Action Button */}
-            <button
+            {/* Field 5: Large Bright Green Search Action Button with ArrowFill Animation */}
+            <ArrowFillButton
+              as="button"
               type="submit"
-              className="px-8 py-3.5 rounded-xl md:rounded-full bg-[#00B86B] hover:bg-[#00A35E] active:scale-95 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
-            >
-              <Search className="w-4 h-4 stroke-[2.5]" />
-              <span>Search</span>
-            </button>
+              btnText="Search"
+              leftIcon={<Search className="w-4 h-4 stroke-[2.5]" />}
+              variant="emerald"
+              size="lg"
+              bgColor="#00B86B"
+              textColor="#ffffff"
+              fillBgColor="#ffffff"
+              fillTextColor="#00834F"
+              hoverFillBgColor="#ffffff"
+              hoverFillTextColor="#00834F"
+              arrowColor="#00834F"
+              hoverArrowColor="#00834F"
+              className="text-sm font-bold shadow-md border-[#00B86B] shrink-0"
+            />
           </form>
         </div>
 

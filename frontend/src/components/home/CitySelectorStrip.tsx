@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
+import { ArrowFillButton } from "@/components/ui/arrow-fill-button";
 
 interface CityItem {
   id: string;
@@ -118,14 +119,23 @@ export function CitySelectorStrip() {
             </p>
           </div>
 
-          {/* Premium Outlined "Explore all cities →" Button */}
-          <Link
+          {/* Premium Outlined "Explore all cities →" Button with ArrowFill Animation */}
+          <ArrowFillButton
+            as={Link}
             href="/cities"
-            className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-600/35 bg-white/95 hover:bg-[#EAF8F0] text-[#079B50] font-black text-xs sm:text-sm shadow-xs hover:shadow-sm hover:border-[#079B50] transition-all duration-200 self-start sm:self-auto shrink-0 relative z-20"
-          >
-            <span>Explore all cities</span>
-            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
-          </Link>
+            btnText="Explore all cities"
+            variant="outline"
+            size="md"
+            bgColor="#ffffff"
+            textColor="#079B50"
+            fillBgColor="#009B62"
+            fillTextColor="#ffffff"
+            hoverFillBgColor="#00834F"
+            hoverFillTextColor="#ffffff"
+            arrowColor="#079B50"
+            hoverArrowColor="#ffffff"
+            className="text-xs sm:text-sm font-black border-emerald-600/35 shadow-xs hover:border-[#079B50] self-start sm:self-auto shrink-0 relative z-20"
+          />
         </div>
 
         {/* ======================================================== */}
