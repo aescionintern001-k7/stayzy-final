@@ -139,6 +139,11 @@ function RegisterContent() {
         throw new Error(data.error || "Registration failed. Please try again.");
       }
 
+      if (typeof window !== "undefined" && data.user) {
+        localStorage.setItem("stayzy_user", JSON.stringify(data.user));
+        window.dispatchEvent(new Event("stayzy_auth_changed"));
+      }
+
       toast.success("Welcome to Stayzy!", "Your account has been created successfully.");
       router.push(redirect);
       router.refresh();

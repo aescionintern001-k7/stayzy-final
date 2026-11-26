@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
 import { BotanicalDecorations } from "@/components/common/BotanicalDecorations";
 import { StayzyLogo } from "@/components/common/StayzyLogo";
+import { calculateBookingPricing } from "@/lib/pricing";
+import { DurationType } from "@/lib/types";
 import {
   ShieldCheck,
   Clock,
@@ -89,7 +91,21 @@ function CheckoutContent() {
     async function loadData() {
       try {
         setLoading(true);
-        // 1. Fetch server pricing
+        // 1. Fetch room details first so we have exact rate plans even in static mode
+        let currentRoom: any = null;
+        try {
+          const roomRes = await fetch(`/api/rooms`);
+          const roomContentType = roomRes.headers.get("content-type") || "";
+          const roomList = roomContentType.includes("application/json")
+            ? await roomRes.json()
+            : { success: false };
+          if (roomList.success && Array.isArray(roomList.rooms)) {
+            currentRoom = roomList.rooms.find((r: any) => r.id === roomTypeId);
+            setRoomData(currentRoom);
+          }
+        } catch {}
+
+        // 2. Fetch server pricing (or calculate from matched room rate plan)
         const priceRes = await fetch("/api/pricing/calculate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -106,21 +122,32 @@ function CheckoutContent() {
         const priceData = priceContentType.includes("application/json")
           ? await priceRes.json()
           : { success: false };
-        if (!priceData.success) {
+
+        const plans = currentRoom?.allRatePlans || currentRoom?.ratePlans || [];
+        const matchedPlan =
+          plans.find((p: any) => p.durationType === durationType) ||
+          currentRoom?.currentRatePlan ||
+          plans[0];
+
+        if (matchedPlan) {
+          const exactCalc = calculateBookingPricing({
+            ratePlan: matchedPlan,
+            durationType: durationType as DurationType,
+            durationCount,
+            startDateStr: startDate,
+            startTimeStr: startTime,
+            includeFood,
+          });
+          if (exactCalc.success) {
+            setPricing(exactCalc.breakdown);
+            return;
+          }
+        }
+
+        if (!priceData.success || !priceData.breakdown) {
           throw new Error(priceData.error || "Failed to calculate booking pricing.");
         }
         setPricing(priceData.breakdown);
-
-        // 2. Fetch room details
-        const roomRes = await fetch(`/api/rooms`);
-        const roomContentType = roomRes.headers.get("content-type") || "";
-        const roomList = roomContentType.includes("application/json")
-          ? await roomRes.json()
-          : { success: false };
-        if (roomList.success) {
-          const currentRoom = roomList.rooms.find((r: any) => r.id === roomTypeId);
-          setRoomData(currentRoom);
-        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -164,6 +191,21 @@ function CheckoutContent() {
           guestCount,
           specialRequests,
           termsAccepted,
+          payableNow: pricing?.payableNow,
+          basePrice: pricing?.baseAmount,
+          foodCharges: pricing?.foodCharge,
+          taxes: pricing?.taxes,
+          depositAmount: pricing?.depositAmount,
+          totalAmount: pricing?.totalAmount,
+          startDateTime: pricing?.startDateTime,
+          endDateTime: pricing?.endDateTime,
+          roomName: roomData?.name,
+          roomSlug: roomData?.slug,
+          propertyId: roomData?.property?.id,
+          propertyName: roomData?.property?.name,
+          propertyAddress: roomData?.property?.address,
+          propertyCity: roomData?.property?.city,
+          roomImage: roomData?.images?.[0],
         }),
       });
 
@@ -217,7 +259,16 @@ function CheckoutContent() {
 
       if (status === "SUCCESS") {
         toast.success("Payment Successful", "Your booking has been confirmed!");
-        router.push(`/booking-confirmation/${paymentSession.bookingId}`);
+        const isStaticClientBooking = String(paymentSession.bookingId).startsWith("book-");
+        if (isStaticClientBooking) {
+          router.push(
+            `/checkout/success?bookingId=${encodeURIComponent(
+              paymentSession.bookingId
+            )}&ref=${encodeURIComponent(paymentSession.bookingReference || "")}`
+          );
+        } else {
+          router.push(`/booking-confirmation/${paymentSession.bookingId}`);
+        }
       } else {
         toast.warning(
           "Payment Unsuccessful",

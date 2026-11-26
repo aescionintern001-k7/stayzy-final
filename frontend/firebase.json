@@ -101,10 +101,6 @@
         "destination": "/api/visits/my.json"
       },
       {
-        "source": "/api/auth/me",
-        "destination": "/api/auth/me.json"
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }

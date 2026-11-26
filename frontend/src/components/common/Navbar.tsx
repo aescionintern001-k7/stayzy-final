@@ -85,7 +85,8 @@ export function Navbar() {
       try {
         const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (!active) return;
-        if (res.ok) {
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
           const data = await res.json();
           if (data?.user?.role) {
             setCurrentRole(data.user.role);
@@ -94,13 +95,25 @@ export function Navbar() {
             }
             return;
           }
+          setCurrentRole(null);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("stayzy_user");
+            localStorage.removeItem("stayzy_jwt_token");
+            localStorage.removeItem("stayzy_token");
+          }
+          return;
+        }
+        if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("stayzy_user");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed?.role) {
+              setCurrentRole(parsed.role);
+              return;
+            }
+          }
         }
         setCurrentRole(null);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("stayzy_user");
-          localStorage.removeItem("stayzy_jwt_token");
-          localStorage.removeItem("stayzy_token");
-        }
       } catch {
         if (active) setCurrentRole(null);
       }

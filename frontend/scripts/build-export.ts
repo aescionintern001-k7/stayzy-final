@@ -3,45 +3,34 @@ import path from "path";
 import { execSync } from "child_process";
 
 async function main() {
-  console.log("=== STEP 1: Pre-caching dynamic API data ===");
+  console.log("=== STEP 1: Pre-caching dynamic API data from Prisma ===");
   let roomsJson = "";
   let contentJson = "";
 
   try {
-    const res = await fetch("http://localhost:3000/api/rooms");
-    if (res.ok) {
-      roomsJson = await res.text();
-      console.log(`Fetched /api/rooms from local server (${roomsJson.length} bytes)`);
-    }
-  } catch {
-    console.log("Dev server not responding, falling back to direct database query");
-  }
-
-  if (!roomsJson) {
-    try {
-      const { prisma } = await import("../src/lib/prisma");
-      const roomTypes = await prisma.roomType.findMany({
-        include: {
-          property: true,
-          ratePlans: { where: { isEnabled: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      const enriched = roomTypes.map((rt: { images: any; keyAmenities: any; ratePlans: any[]; }) => ({
-        ...rt,
-        images: JSON.parse(rt.images || "[]"),
-        keyAmenities: JSON.parse(rt.keyAmenities || "[]"),
-        currentRatePlan: rt.ratePlans.find((r) => r.durationType === "MONTHLY") || rt.ratePlans[0],
-        allRatePlans: rt.ratePlans,
-        isAvailable: true,
-        availableCount: 3,
-      }));
-      roomsJson = JSON.stringify({ success: true, rooms: enriched });
-      console.log(`Generated rooms JSON from Prisma (${roomTypes.length} room types)`);
-    } catch (e: any) {
-      console.warn("Could not query room types from DB, using fallback empty array:", e.message);
-      roomsJson = JSON.stringify({ success: true, rooms: [] });
-    }
+    const { prisma } = await import("../src/lib/prisma");
+    const roomTypes = await prisma.roomType.findMany({
+      include: {
+        property: true,
+        ratePlans: { where: { isEnabled: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const enriched = roomTypes.map((rt: { images: any; keyAmenities: any; ratePlans: any[]; }) => ({
+      ...rt,
+      images: JSON.parse(rt.images || "[]"),
+      keyAmenities: JSON.parse(rt.keyAmenities || "[]"),
+      currentRatePlan: rt.ratePlans.find((r) => r.durationType === "MONTHLY") || rt.ratePlans[0],
+      ratePlans: rt.ratePlans,
+      allRatePlans: rt.ratePlans,
+      isAvailable: true,
+      availableCount: 3,
+    }));
+    roomsJson = JSON.stringify({ success: true, rooms: enriched });
+    console.log(`Generated rooms JSON from Prisma (${roomTypes.length} room types)`);
+  } catch (e: any) {
+    console.warn("Could not query room types from DB, using fallback empty array:", e.message);
+    roomsJson = JSON.stringify({ success: true, rooms: [] });
   }
 
   try {
@@ -269,7 +258,7 @@ async function main() {
     });
     fs.writeFileSync(path.join(outAdminApiDir, "customers.json"), customersData, "utf8");
 
-    const authMeData = JSON.stringify({ success: true, user: DEMO_USERS.admin });
+    const authMeData = JSON.stringify({ success: true, user: null });
     fs.writeFileSync(path.join(outAuthApiDir, "me.json"), authMeData, "utf8");
 
     console.log("Pre-cached all Admin and User JSON endpoints in out/api/");
@@ -339,7 +328,6 @@ async function main() {
           { source: "/api/bookings/my", destination: "/api/bookings/my.json" },
           { source: "/api/payments/my", destination: "/api/payments/my.json" },
           { source: "/api/visits/my", destination: "/api/visits/my.json" },
-          { source: "/api/auth/me", destination: "/api/auth/me.json" },
           { source: "**", destination: "/index.html" },
         ],
       },

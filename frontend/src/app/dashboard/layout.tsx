@@ -70,11 +70,21 @@ export default function DashboardLayout({
     async function loadUser() {
       try {
         const res = await fetch("/api/auth/me", { cache: "no-store" });
-        if (res.ok) {
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
           const data = await res.json();
           if (data.user) {
             setUser(data.user);
             return;
+          }
+        } else if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("stayzy_user");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed?.id) {
+              setUser(parsed);
+              return;
+            }
           }
         }
         if (typeof window !== "undefined") {

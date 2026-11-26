@@ -12,120 +12,282 @@ import {
   INITIAL_USERS,
   DEMO_USERS,
 } from "@/lib/mock-data";
+import { calculateBookingPricing } from "@/lib/pricing";
+import { DurationType } from "@/lib/types";
 
-export function ClientDataSync() {
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+function installStaticDataSync() {
+  if (typeof window === "undefined") return;
 
-    // 1. Initialize LocalStorage if not already set
-    if (!localStorage.getItem("stayzy_initialized")) {
-      localStorage.setItem("stayzy_payments", JSON.stringify(INITIAL_PAYMENTS));
-      localStorage.setItem("stayzy_bookings", JSON.stringify(INITIAL_BOOKINGS));
-      localStorage.setItem("stayzy_schedules", JSON.stringify(INITIAL_SCHEDULES));
-      localStorage.setItem("stayzy_refunds", JSON.stringify(INITIAL_REFUNDS));
-      localStorage.setItem("stayzy_visits", JSON.stringify(INITIAL_VISITS));
-      localStorage.setItem("stayzy_tickets", JSON.stringify(INITIAL_TICKETS));
-      localStorage.setItem("stayzy_properties", JSON.stringify(INITIAL_PROPERTIES));
-      localStorage.setItem("stayzy_users", JSON.stringify(INITIAL_USERS));
-      localStorage.setItem("stayzy_initialized", "true");
+  // 1. Initialize LocalStorage if not already set
+  if (!localStorage.getItem("stayzy_initialized")) {
+    localStorage.setItem("stayzy_payments", JSON.stringify(INITIAL_PAYMENTS));
+    localStorage.setItem("stayzy_bookings", JSON.stringify(INITIAL_BOOKINGS));
+    localStorage.setItem("stayzy_schedules", JSON.stringify(INITIAL_SCHEDULES));
+    localStorage.setItem("stayzy_refunds", JSON.stringify(INITIAL_REFUNDS));
+    localStorage.setItem("stayzy_visits", JSON.stringify(INITIAL_VISITS));
+    localStorage.setItem("stayzy_tickets", JSON.stringify(INITIAL_TICKETS));
+    localStorage.setItem("stayzy_properties", JSON.stringify(INITIAL_PROPERTIES));
+    localStorage.setItem("stayzy_users", JSON.stringify(INITIAL_USERS));
+    localStorage.setItem("stayzy_initialized", "true");
+  }
+
+  if (!localStorage.getItem("stayzy_users")) {
+    localStorage.setItem("stayzy_users", JSON.stringify(INITIAL_USERS));
+  }
+  if (!localStorage.getItem("stayzy_properties")) {
+    localStorage.setItem("stayzy_properties", JSON.stringify(INITIAL_PROPERTIES));
+  }
+
+  if ((window as any).__stayzyFetchPatched) return;
+  (window as any).__stayzyFetchPatched = true;
+
+  const getStore = (key: string, fallback: any) => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const setStore = (key: string, data: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (err) {
+      console.warn("LocalStorage write error:", err);
+    }
+  };
+
+  // 2. Intercept window.fetch to provide bulletproof fallback for static hosts (Firebase Hosting)
+  const originalFetch = window.fetch.bind(window);
+  (window as any).__stayzyOriginalFetch = originalFetch;
+
+  window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const urlString =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+        ? input.toString()
+        : (input as Request).url;
+    const parsedUrl = new URL(urlString, window.location.origin);
+    const pathname = parsedUrl.pathname;
+    const method = (init?.method || "GET").toUpperCase();
+
+    if (!pathname.startsWith("/api/")) {
+      return originalFetch(input, init);
     }
 
-    if (!localStorage.getItem("stayzy_users")) {
-      localStorage.setItem("stayzy_users", JSON.stringify(INITIAL_USERS));
-    }
-    if (!localStorage.getItem("stayzy_properties")) {
-      localStorage.setItem("stayzy_properties", JSON.stringify(INITIAL_PROPERTIES));
-    }
+    // Try actual network request first (with safe /api/auth/me check so static HTML never bypasses interceptor)
+    try {
+      const res = await originalFetch(input, init);
+      const contentType = res.headers.get("content-type") || "";
 
-    // Helper functions to read/write storage
-    const getStore = (key: string, fallback: any) => {
-      try {
-        const item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : fallback;
-      } catch {
-        return fallback;
+      if (contentType.includes("application/json")) {
+        return res;
       }
+      if (!contentType.includes("text/html") && res.status !== 404) {
+        return res;
+      }
+    } catch {
+      // Network error (offline or static host), fallback below
+    }
+
+    const createJsonResponse = (data: any, status = 200) => {
+      return new Response(JSON.stringify(data), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
     };
 
-    const setStore = (key: string, data: any) => {
-      try {
-        localStorage.setItem(key, JSON.stringify(data));
-      } catch (err) {
-        console.warn("LocalStorage write error:", err);
-      }
-    };
+    const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
-    // 2. Intercept window.fetch to provide bulletproof fallback for static hosts (Firebase Hosting)
-    const originalFetch = window.fetch;
+    // AUTH ROUTES (never auto-login without explicit user action)
+    if (pathname === "/api/auth/me") {
+      const storedUser = getStore("stayzy_user", null);
+      return createJsonResponse({ success: true, user: storedUser });
+    }
 
-    window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-      const urlString = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
-      const parsedUrl = new URL(urlString, window.location.origin);
-      const pathname = parsedUrl.pathname;
-      const method = (init?.method || "GET").toUpperCase();
-
-      // Only intercept /api/ routes
-      if (!pathname.startsWith("/api/")) {
-        return originalFetch(input, init);
+    if (pathname === "/api/auth/login") {
+      let body: any = {};
+      if (init?.body) {
+        try {
+          body = JSON.parse(init.body as string);
+        } catch {}
       }
 
-      // Try actual network request first
-      try {
-        const res = await originalFetch(input, init);
-        const contentType = res.headers.get("content-type") || "";
-
-        // Never swallow real API JSON responses
-        if (contentType.includes("application/json")) {
-          return res;
-        }
-        if (!contentType.includes("text/html") && res.status !== 404) {
-          return res;
-        }
-      } catch {
-        // Network error (offline or server down), fallback below
-      }
-
-      // --- CLIENT STORE ROUTER (Simulates catalog on static hosting, NEVER fakes auth) ---
-      const createJsonResponse = (data: any, status = 200) => {
-        return new Response(JSON.stringify(data), {
-          status,
-          headers: { "Content-Type": "application/json" },
-        });
-      };
-
-      // AUTH ROUTES (fail closed — never auto-login as Admin)
-      if (pathname === "/api/auth/me") {
-        const storedUser = getStore("stayzy_user", null);
-        return createJsonResponse({ success: true, user: storedUser });
-      }
-
-      if (
-        pathname === "/api/auth/login" ||
-        pathname === "/api/auth/register" ||
-        pathname === "/api/auth/google"
-      ) {
+      if (!isDemoMode) {
         return createJsonResponse(
           {
             success: false,
-            error: "Authentication service is unavailable in static preview mode. Please run the backend server.",
+            error: "Authentication service is unavailable in static preview mode.",
           },
           503
         );
       }
 
-      if (pathname === "/api/auth/logout") {
-        localStorage.removeItem("stayzy_user");
-        localStorage.removeItem("stayzy_jwt_token");
-        localStorage.removeItem("stayzy_token");
-        return createJsonResponse({ success: true, message: "Logged out" });
+      if (body.demoType === "admin") {
+        setStore("stayzy_user", DEMO_USERS.admin);
+        return createJsonResponse({ success: true, user: DEMO_USERS.admin });
+      }
+      if (body.demoType === "owner") {
+        setStore("stayzy_user", DEMO_USERS.owner);
+        return createJsonResponse({ success: true, user: DEMO_USERS.owner });
+      }
+      if (body.demoType === "customer") {
+        setStore("stayzy_user", DEMO_USERS.customer);
+        return createJsonResponse({ success: true, user: DEMO_USERS.customer });
       }
 
-      if (pathname === "/api/auth/switch") {
+      const email = String(body.email || "").trim().toLowerCase();
+      const phone = String(body.phone || "").replace(/\D/g, "");
+      const password = String(body.password || "");
+
+      const demoPasswords: Record<string, { user: any; pass: string }> = {
+        "admin@stayzy.com": { user: DEMO_USERS.admin, pass: "AdminPassword123!" },
+        "aarav.sharma@example.com": { user: DEMO_USERS.customer, pass: "password123" },
+        "rajesh.pg@stayzy.com": { user: DEMO_USERS.owner, pass: "password123" },
+        "host@stayzy.com": { user: DEMO_USERS.owner, pass: "password123" },
+      };
+
+      let matchedUser: any = null;
+      if (email && demoPasswords[email] && demoPasswords[email].pass === password) {
+        matchedUser = demoPasswords[email].user;
+      } else {
+        const users = getStore("stayzy_users", INITIAL_USERS);
+        const found = users.find((u: any) => {
+          const emailMatch = email && String(u.email || "").toLowerCase() === email;
+          const phoneDigits = String(u.phone || "").replace(/\D/g, "");
+          const phoneMatch = phone && phoneDigits && phoneDigits.endsWith(phone.slice(-10));
+          return (emailMatch || phoneMatch) && (!u.demoPassword || u.demoPassword === password);
+        });
+        if (found) {
+          matchedUser = {
+            id: found.id,
+            name: found.name,
+            email: found.email,
+            phone: found.phone || null,
+            role: found.role || "CUSTOMER",
+          };
+        }
+      }
+
+      if (!matchedUser) {
+        return createJsonResponse({ success: false, error: "Invalid email or password." }, 401);
+      }
+
+      if (body.requiredRole === "ADMIN" && matchedUser.role !== "ADMIN") {
+        return createJsonResponse(
+          { success: false, error: "Access denied. This account does not possess administrator credentials." },
+          403
+        );
+      }
+
+      setStore("stayzy_user", matchedUser);
+      return createJsonResponse({ success: true, user: matchedUser });
+    }
+
+    if (pathname === "/api/auth/register") {
+      if (!isDemoMode) {
+        return createJsonResponse(
+          { success: false, error: "Registration service is unavailable in static preview mode." },
+          503
+        );
+      }
+      let body: any = {};
+      if (init?.body) {
+        try {
+          body = JSON.parse(init.body as string);
+        } catch {}
+      }
+      const cleanEmail = String(body.email || "").trim().toLowerCase();
+      if (!cleanEmail || !body.name || !body.password) {
+        return createJsonResponse(
+          { success: false, error: "Please provide your full name, email, and password." },
+          400
+        );
+      }
+      const users = getStore("stayzy_users", INITIAL_USERS);
+      if (users.some((u: any) => String(u.email || "").toLowerCase() === cleanEmail)) {
+        return createJsonResponse(
+          { success: false, error: "An account with this email already exists. Please log in instead." },
+          409
+        );
+      }
+      const newUser = {
+        id: `usr-${Date.now()}`,
+        name: String(body.name).trim(),
+        email: cleanEmail,
+        phone: body.phone || null,
+        role: "CUSTOMER",
+        status: "ACTIVE",
+        demoPassword: String(body.password),
+        joinedDate: "Today",
+      };
+      setStore("stayzy_users", [newUser, ...users]);
+      const sessionUser = {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+      };
+      setStore("stayzy_user", sessionUser);
+      return createJsonResponse({ success: true, user: sessionUser }, 201);
+    }
+
+    if (pathname === "/api/auth/google") {
+      return createJsonResponse(
+        { success: false, error: "Google backend session verification unavailable in static mode." },
+        503
+      );
+    }
+
+    if (pathname === "/api/auth/profile" && method === "PATCH") {
+      let body: any = {};
+      if (init?.body) {
+        try {
+          body = JSON.parse(init.body as string);
+        } catch {}
+      }
+      const current = getStore("stayzy_user", null);
+      if (!current) {
+        return createJsonResponse({ success: false, error: "Unauthorized" }, 401);
+      }
+      const updated = {
+        ...current,
+        name: body.name || current.name,
+        phone: body.phone !== undefined ? body.phone : current.phone,
+      };
+      setStore("stayzy_user", updated);
+      return createJsonResponse({ success: true, user: updated });
+    }
+
+    if (pathname === "/api/auth/logout") {
+      localStorage.removeItem("stayzy_user");
+      localStorage.removeItem("stayzy_jwt_token");
+      localStorage.removeItem("stayzy_token");
+      return createJsonResponse({ success: true, message: "Logged out" });
+    }
+
+    if (pathname === "/api/auth/switch") {
+      if (!isDemoMode) {
         return createJsonResponse(
           { success: false, error: "Role switching is disabled. Please sign in with your account." },
           403
         );
       }
+      let body: any = {};
+      if (init?.body) {
+        try {
+          body = JSON.parse(init.body as string);
+        } catch {}
+      }
+      const role = String(body.role || "").toUpperCase();
+      const target =
+        role === "ADMIN" ? DEMO_USERS.admin : role === "OWNER" ? DEMO_USERS.owner : DEMO_USERS.customer;
+      setStore("stayzy_user", target);
+      return createJsonResponse({ success: true, user: target });
+    }
 
       // ADMIN USERS (3-Role Management)
       if (pathname === "/api/admin/users") {
@@ -347,6 +509,53 @@ export function ClientDataSync() {
         }
       }
 
+      // RESIDENT BOOKING EXTEND & CANCEL
+      if (pathname.startsWith("/api/bookings/") && pathname.endsWith("/extend")) {
+        const bookingId = pathname.split("/")[3];
+        let body: any = {};
+        if (init?.body) {
+          try {
+            body = JSON.parse(init.body as string);
+          } catch {}
+        }
+        const addCount = Number(body.additionalCount) || 1;
+        const bookings = getStore("stayzy_bookings", INITIAL_BOOKINGS);
+        const target = bookings.find((b: any) => b.id === bookingId);
+        if (target) {
+          target.durationCount = (Number(target.durationCount) || 1) + addCount;
+          const endMs = new Date(target.endTime).getTime();
+          const dayMs =
+            target.durationType === "HOURLY"
+              ? 3600000
+              : target.durationType === "WEEKLY"
+              ? 7 * 86400000
+              : target.durationType === "MONTHLY"
+              ? 30 * 86400000
+              : 86400000;
+          target.endTime = new Date((Number.isNaN(endMs) ? Date.now() : endMs) + addCount * dayMs).toISOString();
+          setStore("stayzy_bookings", bookings);
+        }
+        return createJsonResponse({ success: true, message: `Stay extended by ${addCount} unit(s).` });
+      }
+
+      if (pathname.startsWith("/api/bookings/") && pathname.endsWith("/cancel")) {
+        const bookingId = pathname.split("/")[3];
+        let body: any = {};
+        if (init?.body) {
+          try {
+            body = JSON.parse(init.body as string);
+          } catch {}
+        }
+        const bookings = getStore("stayzy_bookings", INITIAL_BOOKINGS);
+        const target = bookings.find((b: any) => b.id === bookingId);
+        if (target) {
+          target.status = "CANCELLED";
+          target.cancellationReason = body.reason || "Cancelled by resident";
+          setStore("stayzy_bookings", bookings);
+        }
+        return createJsonResponse({ success: true, message: "Booking cancelled successfully." });
+      }
+
       // RESIDENT USER BOOKINGS
       if (pathname === "/api/bookings/my") {
         const bookings = getStore("stayzy_bookings", INITIAL_BOOKINGS);
@@ -375,11 +584,11 @@ export function ClientDataSync() {
         const visits = getStore("stayzy_visits", INITIAL_VISITS);
         const newVisit = {
           id: `visit-${Date.now()}`,
-          fullName: body.fullName || "Scheduled Guest",
-          email: body.email || "guest@example.com",
-          phone: body.phone || "+91 99887 76655",
-          visitDate: body.visitDate || new Date().toISOString().split("T")[0],
-          visitTime: body.visitTime || "11:00 AM",
+          fullName: body.customerName || body.fullName || "Scheduled Guest",
+          email: body.customerEmail || body.email || "guest@example.com",
+          phone: body.customerPhone || body.phone || "+91 99887 76655",
+          visitDate: body.preferredDate || body.visitDate || new Date().toISOString().split("T")[0],
+          visitTime: body.timeSlot || body.visitTime || "11:00 AM",
           preferredDuration: body.preferredDuration || "MONTHLY",
           propertyId: body.propertyId || "prop-koramangala",
           status: "CONFIRMED",
@@ -443,39 +652,44 @@ export function ClientDataSync() {
           } catch {}
         }
         const count = Number(body.durationCount) || 1;
-        const durationType = body.durationType || "MONTHLY";
-        let baseRate = 28000;
-        if (durationType === "HOURLY") baseRate = 180;
-        else if (durationType === "DAILY") baseRate = 750;
-        else if (durationType === "WEEKLY") baseRate = 4200;
-        else if (durationType === "YEARLY") baseRate = 320000;
-
-        const basePrice = baseRate * count;
-        const foodCharges = body.includeFood ? (durationType === "MONTHLY" ? 3500 * count : 250 * count) : 0;
-        const taxes = Math.round((basePrice + foodCharges) * 0.12);
-        const depositAmount = durationType === "MONTHLY" ? 30000 : durationType === "YEARLY" ? 35000 : 2000;
-        const totalAmount = basePrice + foodCharges + taxes + depositAmount;
-
-        const breakdown = {
+        const durationType = (body.durationType || "MONTHLY") as DurationType;
+        const defaultRates: Record<string, { price: number; deposit: number; food: number }> = {
+          HOURLY: { price: 180, deposit: 500, food: 0 },
+          DAILY: { price: 750, deposit: 1000, food: 250 },
+          WEEKLY: { price: 4200, deposit: 5000, food: 1200 },
+          MONTHLY: { price: 28000, deposit: 20000, food: 3500 },
+          YEARLY: { price: 320000, deposit: 35000, food: 3500 },
+        };
+        const cfg = defaultRates[durationType] || defaultRates.MONTHLY;
+        const calc = calculateBookingPricing({
+          ratePlan: {
+            durationType,
+            price: cfg.price,
+            depositAmount: cfg.deposit,
+            foodMonthlyCharge: cfg.food,
+            minDuration: 1,
+            maxDuration: null,
+            allowedHoursStart: "08:00",
+            allowedHoursEnd: "22:00",
+            electricityRule: "Included in rent",
+            notes: null,
+            isEnabled: true,
+          },
           durationType,
           durationCount: count,
-          unitPrice: baseRate,
-          baseAmount: basePrice,
-          foodCharge: foodCharges,
-          taxes,
-          depositAmount,
-          totalAmount,
-          payableNow: totalAmount,
-          balanceRemaining: 0,
-          hasGst: true,
-          isDepositRefundable: true,
-        };
-
-        return createJsonResponse({
-          success: true,
-          breakdown,
-          pricing: breakdown,
+          startDateStr: body.startDate || new Date().toISOString().split("T")[0],
+          startTimeStr: body.startTime || "10:00",
+          includeFood: Boolean(body.includeFood),
         });
+
+        if (calc.success) {
+          return createJsonResponse({
+            success: true,
+            breakdown: calc.breakdown,
+            pricing: calc.breakdown,
+          });
+        }
+        return createJsonResponse({ success: false, error: calc.error }, 400);
       }
 
       // CHECKOUT HOLD & BOOKING
@@ -499,41 +713,52 @@ export function ClientDataSync() {
         const bookingId = `book-${Date.now()}`;
         const ref = `STY-${Date.now().toString().slice(-6)}`;
         const bookings = getStore("stayzy_bookings", INITIAL_BOOKINGS);
+        const currentUser = getStore("stayzy_user", null);
+        const basePrice = Number(body.basePrice) || 28000;
+        const foodCharges = Number(body.foodCharges) || 0;
+        const taxes = Number(body.taxes) || Math.round((basePrice + foodCharges) * 0.12);
+        const depositAmount = body.depositAmount !== undefined ? Number(body.depositAmount) : 20000;
+        const totalAmount = Number(body.totalAmount) || basePrice + foodCharges + taxes + depositAmount;
+        const payableNow = Number(body.payableNow) || totalAmount;
+        const paymentId = `pay-${Date.now()}`;
+        const transactionRef = `TXN_DEMO_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
         const newBooking = {
           id: bookingId,
           bookingReference: ref,
-          userId: "usr-customer-001",
-          propertyId: "prop-koramangala",
-          guestName: body.guestName || "Aarav Sharma",
-          guestEmail: body.guestEmail || "aarav.sharma@example.com",
-          guestPhone: body.guestPhone || "+91 98765 12345",
+          userId: currentUser?.id || "usr-customer-001",
+          propertyId: body.propertyId || "prop-koramangala",
+          guestName: body.guestName || currentUser?.name || "Aarav Sharma",
+          guestEmail: body.guestEmail || currentUser?.email || "aarav.sharma@example.com",
+          guestPhone: body.guestPhone || currentUser?.phone || "+91 98765 12345",
           guestCount: Number(body.guestCount) || 1,
           durationType: body.durationType || "MONTHLY",
           durationCount: Number(body.durationCount) || 1,
-          startTime: body.startTime || new Date().toISOString(),
-          endTime: new Date(Date.now() + 30 * 86400000).toISOString(),
-          status: "CONFIRMED",
-          paymentStatus: "PAID",
-          basePrice: 28000,
-          foodCharges: 3500,
-          taxes: 3780,
-          depositAmount: 30000,
-          totalAmount: 65280,
-          payableNow: 65280,
-          balanceRemaining: 0,
+          startTime: body.startDateTime || body.startDate || new Date().toISOString(),
+          endTime: body.endDateTime || new Date(Date.now() + 30 * 86400000).toISOString(),
+          status: "PENDING",
+          paymentStatus: "UNPAID",
+          basePrice,
+          foodCharges,
+          taxes,
+          depositAmount,
+          totalAmount,
+          payableNow,
+          balanceRemaining: Math.max(0, totalAmount - payableNow),
           createdAt: new Date().toISOString(),
           property: {
-            name: "Stayzy Haven — Koramangala",
-            address: "84, 4th Cross, 5th Block, Koramangala",
-            city: "Bengaluru",
+            name: body.propertyName || "Stayzy Haven — Koramangala",
+            address: body.propertyAddress || "84, 4th Cross, 5th Block, Koramangala",
+            city: body.propertyCity || "Bengaluru",
             checkInTime: "12:00 PM",
             checkOutTime: "11:00 AM",
           },
           roomType: {
-            name: "Deluxe Studio Suite",
-            slug: "deluxe-private-studio-suite",
-            images: '["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80"]',
+            name: body.roomName || "Deluxe Studio Suite",
+            slug: body.roomSlug || "deluxe-private-studio-suite",
+            images: JSON.stringify([
+              body.roomImage || "/images/rooms/private-room-main.webp",
+            ]),
           },
           inventoryUnit: {
             identifier: "Room 201-A",
@@ -544,16 +769,15 @@ export function ClientDataSync() {
         bookings.unshift(newBooking);
         setStore("stayzy_bookings", bookings);
 
-        // Also add payment
         const payments = getStore("stayzy_payments", INITIAL_PAYMENTS);
         payments.unshift({
-          id: `pay-${Date.now()}`,
+          id: paymentId,
           bookingId,
-          amount: 65280,
+          amount: payableNow,
           currency: "INR",
-          status: "SUCCESS",
+          status: "PENDING",
           provider: "DEMO_ADAPTER",
-          transactionRef: `TXN_${Date.now().toString().slice(-8)}`,
+          transactionRef,
           isDemo: true,
           createdAt: new Date().toISOString(),
           booking: {
@@ -568,14 +792,55 @@ export function ClientDataSync() {
           success: true,
           bookingId,
           bookingReference: ref,
-          paymentSession: {
-            bookingId,
-            payableNow: 65280,
-            paymentDetails: {
-              transactionRef: `TXN_${Date.now().toString().slice(-8)}`,
-              signature: "demo_sig_verified",
-            },
+          payableNow,
+          currency: "INR",
+          paymentDetails: {
+            paymentId,
+            transactionRef,
+            amount: payableNow,
+            currency: "INR",
+            provider: "DEMO_ADAPTER",
+            isDemo: true,
+            signature: "demo_sig_verified",
+            failedSignature: "demo_sig_failed",
           },
+        });
+      }
+
+      if (pathname === "/api/payments/webhook") {
+        let body: any = {};
+        if (init?.body) {
+          try {
+            body = JSON.parse(init.body as string);
+          } catch {}
+        }
+        const status = body.status === "FAILED" ? "FAILED" : "SUCCESS";
+        const bookings = getStore("stayzy_bookings", INITIAL_BOOKINGS);
+        const booking = bookings.find((b: any) => b.id === body.bookingId);
+        if (booking) {
+          if (status === "SUCCESS") {
+            booking.status = "CONFIRMED";
+            booking.paymentStatus = "PAID";
+          } else {
+            booking.status = "PENDING";
+            booking.paymentStatus = "UNPAID";
+          }
+          setStore("stayzy_bookings", bookings);
+        }
+
+        const payments = getStore("stayzy_payments", INITIAL_PAYMENTS);
+        const payment = payments.find(
+          (p: any) => p.id === body.paymentId || p.transactionRef === body.transactionRef
+        );
+        if (payment) {
+          payment.status = status;
+          setStore("stayzy_payments", payments);
+        }
+
+        return createJsonResponse({
+          success: true,
+          status: status === "SUCCESS" ? "CONFIRMED" : "FAILED",
+          bookingReference: booking?.bookingReference || "STY-DEMO",
         });
       }
 
@@ -677,10 +942,15 @@ export function ClientDataSync() {
       // Fallback for any other /api route: return empty JSON success instead of crashing with HTML
       return createJsonResponse({ success: true, message: "OK" });
     };
+}
 
-    return () => {
-      window.fetch = originalFetch;
-    };
+export function ClientDataSync() {
+  if (typeof window !== "undefined") {
+    installStaticDataSync();
+  }
+
+  useEffect(() => {
+    installStaticDataSync();
   }, []);
 
   return null;
