@@ -82,19 +82,21 @@ function KpiSparkCard({
 }) {
   const colors = SPARK_THEME[theme];
   return (
-    <div className="relative bg-white rounded-[18px] border border-[#E6EAE2] p-4 pb-8 shadow-[0_10px_28px_-16px_rgba(20,37,30,0.10)] overflow-hidden">
-      <div className="flex items-start gap-2.5">
+    <div className="relative bg-white rounded-[18px] border border-[#E6EAE2] p-3.5 pb-7 shadow-[0_10px_28px_-16px_rgba(20,37,30,0.10)] overflow-hidden">
+      <div className="flex items-start gap-2">
         <div
-          className={`w-9 h-9 rounded-[11px] ${colors.iconBg} ${colors.iconText} flex items-center justify-center shrink-0`}
+          className={`w-8 h-8 rounded-[10px] ${colors.iconBg} ${colors.iconText} flex items-center justify-center shrink-0`}
         >
-          <Icon className="w-[18px] h-[18px]" />
+          <Icon className="w-4 h-4" />
         </div>
-        <div className="min-w-0">
-          <span className="text-[11px] font-bold text-[#5F6F67] block truncate">{label}</span>
-          <div className="text-[20px] xl:text-[22px] font-extrabold text-[#14251E] tracking-tight leading-tight mt-0.5">
+        <div className="min-w-0 flex-1">
+          <span className="text-[10.5px] font-bold text-[#5F6F67] block leading-tight">
+            {label}
+          </span>
+          <div className="text-[19px] xl:text-[21px] font-extrabold text-[#14251E] tracking-tight leading-tight mt-0.5">
             {value}
           </div>
-          <span className="text-[10.5px] font-semibold text-[#5F6F67] block mt-0.5 truncate">
+          <span className="text-[10px] font-semibold text-[#5F6F67] block mt-0.5 leading-tight">
             {subtext}
           </span>
         </div>
@@ -389,7 +391,7 @@ export function AdminDashboardClient() {
           <KpiSparkCard
             label="Active Residents"
             value={stats.checkedInCount + stats.confirmedCount}
-            subtext="Confirmed / In-house"
+            subtext="In-house stays"
             icon={Users}
             theme="sky"
           />
