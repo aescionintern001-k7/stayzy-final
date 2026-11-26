@@ -11,7 +11,10 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
-    "provision-admin": "tsx scripts/provision-admin.ts"
+    "provision-admin": "tsx scripts/provision-admin.ts",
+    "sync:push": "powershell -ExecutionPolicy Bypass -File scripts/auto-sync-frontend.ps1",
+    "sync:pull": "powershell -ExecutionPolicy Bypass -File scripts/auto-pull-frontend.ps1",
+    "sync:mirror": "powershell -ExecutionPolicy Bypass -File scripts/auto-pull-frontend.ps1 -MirrorFrontend"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
