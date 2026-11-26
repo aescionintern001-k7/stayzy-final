@@ -3,6 +3,7 @@ import { prisma } from "../prisma";
 import { isUnitAvailable } from "../inventory";
 
 export interface PaymentInitiationResult {
+  paymentId: string;
   transactionRef: string;
   amount: number;
   currency: string;
@@ -10,6 +11,7 @@ export interface PaymentInitiationResult {
   isDemo: boolean;
   paymentUrl?: string;
   signature: string;
+  failedSignature?: string;
 }
 
 const WEBHOOK_SECRET = process.env.PAYMENT_WEBHOOK_SECRET || "stayzy_demo_secret_2026";
@@ -71,14 +73,25 @@ export class PaymentAdapter {
     });
 
     const signature = signWebhookPayload(payloadToSign);
+    const failedSignature = signWebhookPayload(
+      JSON.stringify({
+        paymentId: payment.id,
+        transactionRef,
+        bookingId: params.bookingId,
+        amount: params.amount,
+        status: "FAILED",
+      })
+    );
 
     return {
+      paymentId: payment.id,
       transactionRef,
       amount: params.amount,
       currency: params.currency || "INR",
       provider: isDemo ? "DEMO_ADAPTER" : "RAZORPAY",
       isDemo,
       signature,
+      failedSignature,
     };
   }
 

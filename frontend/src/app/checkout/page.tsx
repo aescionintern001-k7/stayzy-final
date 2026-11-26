@@ -168,19 +168,24 @@ function CheckoutContent() {
 
     try {
       const payload = JSON.stringify({
-        paymentId: paymentSession.paymentDetails.transactionRef,
+        paymentId: paymentSession.paymentDetails.paymentId || paymentSession.paymentDetails.transactionRef,
         transactionRef: paymentSession.paymentDetails.transactionRef,
         bookingId: paymentSession.bookingId,
         amount: paymentSession.payableNow,
         status,
       });
 
+      const signature =
+        status === "FAILED" && paymentSession.paymentDetails.failedSignature
+          ? paymentSession.paymentDetails.failedSignature
+          : paymentSession.paymentDetails.signature;
+
       // Submit to signed webhook endpoint
       const res = await fetch("/api/payments/webhook", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-stayzy-signature": paymentSession.paymentDetails.signature,
+          "x-stayzy-signature": signature,
         },
         body: payload,
       });
