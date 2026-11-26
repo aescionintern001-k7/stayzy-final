@@ -4,6 +4,7 @@ import React, { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Footer } from "@/components/common/Footer";
+import { StayzyLogo } from "@/components/common/StayzyLogo";
 import {
   CheckCircle2,
   CalendarCheck,
@@ -20,6 +21,9 @@ function CheckoutSuccessContent() {
     <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-12 w-full">
       <div className="bg-white rounded-3xl border border-[#E8E6DF] p-8 sm:p-12 shadow-card-hover space-y-8">
         <div className="text-center space-y-3 pb-8 border-b border-[#F0EDE4]">
+          <div className="flex justify-center pb-2">
+            <StayzyLogo variant="dark" size="md" />
+          </div>
           <div className="w-16 h-16 rounded-full bg-[#E8F1D5] text-[#123D2B] flex items-center justify-center mx-auto shadow-sm">
             <CheckCircle2 className="w-10 h-10" />
           </div>

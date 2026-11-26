@@ -195,6 +195,9 @@ export function Navbar() {
   }, [activeCityLetter, cityQuickSearch]);
 
   const isHomeActive = pathname === "/";
+  if (pathname === "/checkout") {
+    return null;
+  }
   const isRoomsActive = pathname.startsWith("/rooms") || pathname === "/explore";
   const isServicesActive = pathname === "/amenities";
   const isCitiesActive = pathname === "/cities";

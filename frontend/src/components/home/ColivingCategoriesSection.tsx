@@ -175,6 +175,161 @@ const ASSURANCE_ITEMS = [
   { icon: Utensils, label: "Chef-Curated Meals" },
 ] as const;
 
+function RoomCategoryCard({
+  cat,
+  index,
+  onOpenGallery,
+}: {
+  cat: RoomCategory;
+  index: number;
+  onOpenGallery: (e: React.MouseEvent, room: RoomCategory, initialIndex: number) => void;
+}) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Automatic infinite 3-second slideshow per room card (staggered start so cards rotate independently); pauses while hovered
+  useEffect(() => {
+    if (isHovered || cat.gallery.length <= 1) return;
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const startDelay = setTimeout(() => {
+      intervalId = setInterval(() => {
+        setCurrentSlide((prev) => (prev + 1) % cat.gallery.length);
+      }, 3000);
+    }, index * 1000);
+
+    return () => {
+      clearTimeout(startDelay);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isHovered, cat.gallery.length, index]);
+
+  const BadgeIcon = cat.badgeIcon;
+  const isThirdOnTablet =
+    index === 2
+      ? "md:col-span-2 md:max-w-[460px] md:mx-auto lg:col-span-1 lg:max-w-none w-full"
+      : "w-full";
+
+  return (
+    <article
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`group bg-white rounded-[20px] border border-[#E4EAE0] overflow-hidden flex flex-col justify-between shadow-[0_10px_30px_-14px_rgba(20,44,53,0.10)] hover:shadow-[0_20px_42px_-14px_rgba(0,155,104,0.18)] hover:border-[#009B68]/45 transition-all duration-300 ease-out hover:-translate-y-1.5 ${isThirdOnTablet}`}
+    >
+      <div>
+        {/* Smooth Crossfade Infinite Image Slideshow */}
+        <div className="relative h-[230px] sm:h-[245px] w-full overflow-hidden bg-[#EDF5E9]">
+          {cat.gallery.map((slide, slideIdx) => (
+            <div
+              key={slide.image}
+              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                slideIdx === currentSlide ? "opacity-100 z-[1]" : "opacity-0 z-0 pointer-events-none"
+              }`}
+              aria-hidden={slideIdx !== currentSlide}
+            >
+              <Image
+                src={slide.image}
+                alt={slide.alt || cat.title}
+                fill
+                quality={100}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                className="object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out"
+                priority={index === 0 && slideIdx === 0}
+              />
+            </div>
+          ))}
+
+          {/* Top-Left Category Badge */}
+          <div className="absolute top-3.5 left-3.5 z-10 pointer-events-none">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[9999px] text-[12px] font-bold bg-white/95 text-[#142C35] shadow-[0_2px_10px_rgba(20,44,53,0.14)] border border-[#E4EAE0]">
+              <BadgeIcon className="w-3.5 h-3.5 text-[#009B68]" aria-hidden="true" />
+              <span>{cat.badge}</span>
+            </span>
+          </div>
+
+          {/* Subtle Slide Progress Dots */}
+          {cat.gallery.length > 1 && (
+            <div className="absolute bottom-4 left-3.5 z-10 flex items-center gap-1.5 pointer-events-none">
+              {cat.gallery.map((_, dotIdx) => (
+                <span
+                  key={dotIdx}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    dotIdx === currentSlide
+                      ? "w-4 bg-white shadow-xs"
+                      : "w-1.5 bg-white/55"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Bottom-Right View Gallery Button */}
+          <button
+            type="button"
+            onClick={(e) => onOpenGallery(e, cat, currentSlide)}
+            className="absolute bottom-3.5 right-3.5 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#142C35]/85 hover:bg-[#142C35] text-white text-[12px] font-semibold shadow-md border border-white/15 transition-all duration-200 hover:scale-[1.03] active:scale-95 cursor-pointer"
+          >
+            <Images className="w-3.5 h-3.5 text-[#00D6A0]" aria-hidden="true" />
+            <span>View Gallery ({cat.gallery.length})</span>
+          </button>
+        </div>
+
+        {/* Card Body */}
+        <div className="p-5 sm:p-6">
+          <h3 className="text-[22px] font-extrabold text-[#142C35] tracking-tight group-hover:text-[#009B68] transition-colors">
+            {cat.title}
+          </h3>
+
+          <p className="mt-2 text-[14px] text-[#556B73] leading-relaxed md:min-h-[68px] xl:min-h-[46px]">
+            {cat.description}
+          </p>
+
+          {/* Three Feature Highlights Strip */}
+          <div className="mt-4 pt-4 border-t border-[#EDF2EA] grid grid-cols-3 divide-x divide-[#EDF2EA]">
+            {cat.features.map((feat) => {
+              const FeatIcon = feat.icon;
+              return (
+                <div
+                  key={feat.label}
+                  className="px-2 first:pl-0 last:pr-0 flex flex-col items-center text-center gap-1.5"
+                >
+                  <div className="w-8 h-8 rounded-[10px] bg-[#EDF5E9] flex items-center justify-center text-[#009B68]">
+                    <FeatIcon className="w-4 h-4" aria-hidden="true" />
+                  </div>
+                  <span className="text-[11.5px] font-semibold text-[#142C35] leading-snug">
+                    {feat.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Separate Pricing Footer */}
+      <div className="mt-auto px-5 sm:px-6 py-4 bg-[#F9FAF6] border-t border-[#E8EDE4] flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[11.5px] font-semibold text-[#64767D]">Starting from</div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-[21px] sm:text-[22px] font-extrabold text-[#142C35] tracking-tight">
+              {cat.price}
+            </span>
+            <span className="text-[12.5px] font-medium text-[#64767D]">/month</span>
+          </div>
+        </div>
+
+        <Link
+          href={`/rooms?category=${cat.categoryParam}`}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] bg-[#009B68] hover:bg-[#008256] text-white text-[13px] font-bold shadow-[0_6px_16px_-6px_rgba(0,155,104,0.55)] hover:shadow-[0_10px_20px_-6px_rgba(0,155,104,0.65)] transition-all duration-200 shrink-0"
+        >
+          <span>View Available Stays</span>
+          <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 export function ColivingCategoriesSection() {
   const [activeModalRoom, setActiveModalRoom] = useState<RoomCategory | null>(null);
   const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
@@ -326,105 +481,14 @@ export function ColivingCategoriesSection() {
 
         {/* Three Equal-Width Room Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-7">
-          {ROOM_CATEGORIES.map((cat, index) => {
-            const BadgeIcon = cat.badgeIcon;
-            const isThirdOnTablet =
-              index === 2
-                ? "md:col-span-2 md:max-w-[460px] md:mx-auto lg:col-span-1 lg:max-w-none w-full"
-                : "w-full";
-
-            return (
-              <article
-                key={cat.id}
-                className={`group bg-white rounded-[20px] border border-[#E4EAE0] overflow-hidden flex flex-col justify-between shadow-[0_10px_30px_-14px_rgba(20,44,53,0.10)] hover:shadow-[0_20px_42px_-14px_rgba(0,155,104,0.18)] hover:border-[#009B68]/45 transition-all duration-300 ease-out hover:-translate-y-1.5 ${isThirdOnTablet}`}
-              >
-                <div>
-                  {/* Sharp Accommodation Photo */}
-                  <div className="relative h-[230px] sm:h-[245px] w-full overflow-hidden bg-[#EDF5E9]">
-                    <Image
-                      src={cat.mainImage}
-                      alt={cat.title}
-                      fill
-                      quality={100}
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out"
-                      priority
-                    />
-
-                    {/* Top-Left Category Badge */}
-                    <div className="absolute top-3.5 left-3.5 z-10 pointer-events-none">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[9999px] text-[12px] font-bold bg-white/95 text-[#142C35] shadow-[0_2px_10px_rgba(20,44,53,0.14)] border border-[#E4EAE0]">
-                        <BadgeIcon className="w-3.5 h-3.5 text-[#009B68]" aria-hidden="true" />
-                        <span>{cat.badge}</span>
-                      </span>
-                    </div>
-
-                    {/* Bottom-Right View Gallery Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => openGalleryModal(e, cat)}
-                      className="absolute bottom-3.5 right-3.5 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#142C35]/85 hover:bg-[#142C35] text-white text-[12px] font-semibold shadow-md border border-white/15 transition-all duration-200 hover:scale-[1.03] active:scale-95 cursor-pointer"
-                    >
-                      <Images className="w-3.5 h-3.5 text-[#00D6A0]" aria-hidden="true" />
-                      <span>View Gallery ({cat.gallery.length})</span>
-                    </button>
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="p-5 sm:p-6">
-                    <h3 className="text-[22px] font-extrabold text-[#142C35] tracking-tight group-hover:text-[#009B68] transition-colors">
-                      {cat.title}
-                    </h3>
-
-                    <p className="mt-2 text-[14px] text-[#556B73] leading-relaxed md:min-h-[68px] xl:min-h-[46px]">
-                      {cat.description}
-                    </p>
-
-                    {/* Three Feature Highlights Strip */}
-                    <div className="mt-4 pt-4 border-t border-[#EDF2EA] grid grid-cols-3 divide-x divide-[#EDF2EA]">
-                      {cat.features.map((feat) => {
-                        const FeatIcon = feat.icon;
-                        return (
-                          <div
-                            key={feat.label}
-                            className="px-2 first:pl-0 last:pr-0 flex flex-col items-center text-center gap-1.5"
-                          >
-                            <div className="w-8 h-8 rounded-[10px] bg-[#EDF5E9] flex items-center justify-center text-[#009B68]">
-                              <FeatIcon className="w-4 h-4" aria-hidden="true" />
-                            </div>
-                            <span className="text-[11.5px] font-semibold text-[#142C35] leading-snug">
-                              {feat.label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Separate Pricing Footer */}
-                <div className="mt-auto px-5 sm:px-6 py-4 bg-[#F9FAF6] border-t border-[#E8EDE4] flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11.5px] font-semibold text-[#64767D]">Starting from</div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-[21px] sm:text-[22px] font-extrabold text-[#142C35] tracking-tight">
-                        {cat.price}
-                      </span>
-                      <span className="text-[12.5px] font-medium text-[#64767D]">/month</span>
-                    </div>
-                  </div>
-
-                  <Link
-                    href={`/rooms?category=${cat.categoryParam}`}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] bg-[#009B68] hover:bg-[#008256] text-white text-[13px] font-bold shadow-[0_6px_16px_-6px_rgba(0,155,104,0.55)] hover:shadow-[0_10px_20px_-6px_rgba(0,155,104,0.65)] transition-all duration-200 shrink-0"
-                  >
-                    <span>View Available Stays</span>
-                    <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-                  </Link>
-                </div>
-              </article>
-            );
-          })}
+          {ROOM_CATEGORIES.map((cat, index) => (
+            <RoomCategoryCard
+              key={cat.id}
+              cat={cat}
+              index={index}
+              onOpenGallery={openGalleryModal}
+            />
+          ))}
         </div>
 
         {/* Room Comparison & Stayzy Assurance Section */}

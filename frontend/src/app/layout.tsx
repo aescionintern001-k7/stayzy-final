@@ -22,6 +22,14 @@ export const metadata: Metadata = {
     "Find a comfortable stay for an hour, a day, or a little longer. Flexible PG and private room booking with transparent pricing.",
   keywords: "PG booking, flexible stay, hourly room, monthly PG, coliving, Stayzy",
   authors: [{ name: "Stayzy Hospitality" }],
+  icons: {
+    icon: [
+      { url: "/stayzy-icon-official.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 import { ClientDataSync } from "@/components/common/ClientDataSync";

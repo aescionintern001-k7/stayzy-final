@@ -111,8 +111,8 @@ export default async function RoomDetailsPage({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <main className="flex-1 bg-white">
+    <div className="min-h-screen flex flex-col bg-[#FCFAF4]">
+      <main className="flex-1 bg-[#FCFAF4]">
         <RoomDetailsClient room={roomProp} initialParams={{}} />
       </main>
 
