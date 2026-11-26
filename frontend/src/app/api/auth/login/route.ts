@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { JWT_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME } from "@/lib/auth";
+import {
+  createSessionToken,
+  JWT_COOKIE_NAME,
+  LEGACY_SESSION_COOKIE_NAME,
+  verifyPassword,
+} from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { getServerBackendUrl } from "@/lib/api/config";
 import { backendRoleToFrontend } from "@/lib/api/adapters";
 
@@ -50,7 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    let backendRes: Response;
+    let backendRes: Response | null = null;
     try {
       backendRes = await fetch(`${getServerBackendUrl()}/auth/login`, {
         method: "POST",
@@ -59,13 +65,57 @@ export async function POST(request: Request) {
         cache: "no-store",
       });
     } catch {
-      return NextResponse.json(
-        { error: "Authentication service is unavailable. Please ensure the backend server is running." },
-        { status: 503, headers: NO_STORE_HEADERS }
-      );
+      backendRes = null;
     }
 
-    if (!backendRes.ok) {
+    if (!backendRes || !backendRes.ok) {
+      // Fallback: check local Prisma user store (for accounts registered in SQLite/Prisma)
+      const prismaUser = await prisma.user.findUnique({
+        where: { email: targetEmail },
+      });
+
+      if (prismaUser && verifyPassword(targetPassword, prismaUser.passwordHash)) {
+        if (requiredRole === "ADMIN" && prismaUser.role !== "ADMIN") {
+          return NextResponse.json(
+            { error: "Access denied. This account does not possess administrator credentials." },
+            { status: 403, headers: NO_STORE_HEADERS }
+          );
+        }
+
+        const localToken = createSessionToken(prismaUser);
+        const response = NextResponse.json(
+          {
+            success: true,
+            user: {
+              id: prismaUser.id,
+              name: prismaUser.name,
+              email: prismaUser.email,
+              phone: prismaUser.phone || null,
+              role: prismaUser.role,
+            },
+            token: localToken,
+          },
+          { headers: NO_STORE_HEADERS }
+        );
+
+        response.cookies.set(JWT_COOKIE_NAME, localToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: cookieMaxAge,
+          sameSite: "lax",
+        });
+        response.cookies.delete(LEGACY_SESSION_COOKIE_NAME);
+        return response;
+      }
+
+      if (!backendRes) {
+        return NextResponse.json(
+          { error: "Authentication service is unavailable. Please ensure the backend server is running." },
+          { status: 503, headers: NO_STORE_HEADERS }
+        );
+      }
+
       const errData = await backendRes.json().catch(() => ({}));
       const errRes = NextResponse.json(
         { error: errData.message || errData.error || "Invalid email address or password." },
