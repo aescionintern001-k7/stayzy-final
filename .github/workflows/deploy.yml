@@ -16,13 +16,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          node-version: 22
 
       - name: Install Frontend Dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: npm install --workspaces=false --no-package-lock --legacy-peer-deps
 
       - name: Generate Prisma Client & Seed Database
         working-directory: ./frontend
@@ -38,21 +36,21 @@ jobs:
         run: npm run build:export
         env:
           DATABASE_URL: "file:./dev.db"
-          NEXT_PUBLIC_APP_URL: "https://stayzy-83375.web.app"
+          NEXT_PUBLIC_APP_URL: "https://stayzy-2e171.web.app"
           NEXT_PUBLIC_DEMO_MODE: "true"
           NEXT_PUBLIC_DEFAULT_TIMEZONE: "Asia/Kolkata"
-          NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAjUnuYLvCGfYJEqQ7unkYxAmWbDrwhy6E"
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "pg-rooms-60c83.firebaseapp.com"
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "pg-rooms-60c83"
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "pg-rooms-60c83.firebasestorage.app"
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "27796929578"
-          NEXT_PUBLIC_FIREBASE_APP_ID: "1:27796929578:web:c9018be5ea6e29db88d753"
-          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-ZB2V2Z6VZ3"
+          NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAm-hx_KDHYrtEdEXm2l8oC8YrRhAkjqtA"
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "stayzy-2e171.firebaseapp.com"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "stayzy-2e171"
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "stayzy-2e171.firebasestorage.app"
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "54975315748"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:54975315748:web:0f7531f49581af40effdb1"
+          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-XS19J82305"
 
       - name: Deploy to Firebase Hosting
         run: |
           if [ -n "${{ secrets.FIREBASE_TOKEN }}" ]; then
-            npx firebase-tools deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --project stayzy-83375 --non-interactive
+            npx firebase-tools deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --project stayzy-2e171 --non-interactive
           else
             echo "::error::FIREBASE_TOKEN is not set in GitHub Repository Secrets!"
             exit 1
