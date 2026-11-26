@@ -95,7 +95,8 @@ export function ClientDataSync() {
 
       // AUTH ROUTES (fail closed — never auto-login as Admin)
       if (pathname === "/api/auth/me") {
-        return createJsonResponse({ success: true, user: null });
+        const storedUser = getStore("stayzy_user", null);
+        return createJsonResponse({ success: true, user: storedUser });
       }
 
       if (

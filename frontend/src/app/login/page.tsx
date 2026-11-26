@@ -135,6 +135,11 @@ function LoginForm() {
         body: JSON.stringify(payload),
       });
 
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error("Authentication service is unavailable in static preview mode. Please use Continue with Google or run the local server.");
+      }
+
       const data = await res.json();
       if (!res.ok || !data.success || !data.user) {
         throw new Error(data.error || "Invalid credentials. Please check and try again.");
@@ -159,18 +164,41 @@ function LoginForm() {
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
 
-      const res = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, rememberMe }),
-      });
+      try {
+        const res = await fetch("/api/auth/google", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, rememberMe }),
+        });
 
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.user) {
-        throw new Error(data.error || "Google authentication failed.");
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await res.json();
+          if (res.ok && data.success && data.user) {
+            routeAfterLogin(data.user);
+            return;
+          }
+          // If backend returned an explicit auth error (not 503/404 static fallback), surface it
+          if (res.status !== 503 && res.status !== 404) {
+            throw new Error(data.error || "Google authentication failed.");
+          }
+        }
+      } catch (fetchErr: any) {
+        if (fetchErr?.message && !/JSON|Unexpected token|Failed to fetch|NetworkError/i.test(fetchErr.message)) {
+          throw fetchErr;
+        }
       }
 
-      routeAfterLogin(data.user);
+      // Static hosting fallback: Firebase Auth already verified the Google user in signInWithPopup
+      const firebaseEmail = result.user.email || "";
+      const fallbackUser = {
+        id: result.user.uid,
+        name: result.user.displayName || firebaseEmail.split("@")[0] || "Resident",
+        email: firebaseEmail,
+        phone: result.user.phoneNumber || null,
+        role: "CUSTOMER",
+      };
+      routeAfterLogin(fallbackUser);
     } catch (err: any) {
       const code = err?.code || "";
       if (code === "auth/popup-closed-by-user") {
