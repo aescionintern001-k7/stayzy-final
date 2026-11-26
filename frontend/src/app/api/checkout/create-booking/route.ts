@@ -103,8 +103,44 @@ export async function POST(request: Request) {
             }
 
             if (matchedPlan) {
+              // Ensure corresponding Property & RoomType exist in local Prisma DB to satisfy FK constraints
+              await prisma.property.upsert({
+                where: { id: property.id },
+                update: {},
+                create: {
+                  id: property.id,
+                  name: property.title || "Stayzy Property",
+                  slug: property.id,
+                  description: property.description || property.title || "Stayzy Property",
+                  address: property.address || "Bengaluru",
+                  city: property.city || "Bengaluru",
+                  state: property.state || "Karnataka",
+                  pincode: property.pincode || "560001",
+                  contactPhone: property.host?.phone || "+91 98765 43210",
+                  contactEmail: property.host?.email || "support@stayzy.com",
+                  coverImage: (Array.isArray(property.images) && property.images[0]) || "/fallback-room.jpg",
+                  images: JSON.stringify(Array.isArray(property.images) ? property.images : []),
+                },
+              });
+
+              const rtId = matchedRt?.id || property.id;
+              await prisma.roomType.upsert({
+                where: { id: rtId },
+                update: {},
+                create: {
+                  id: rtId,
+                  propertyId: property.id,
+                  name: matchedRt?.name || property.title || "Stayzy Room",
+                  slug: rtId,
+                  category: "PRIVATE",
+                  description: property.description || property.title || "Stayzy Room",
+                  keyAmenities: JSON.stringify(Array.isArray(property.amenities) ? property.amenities : []),
+                  images: JSON.stringify(Array.isArray(property.images) ? property.images : []),
+                },
+              });
+
               roomType = {
-                id: matchedRt?.id || property.id,
+                id: rtId,
                 name: matchedRt?.name || property.title,
                 propertyId: property.id,
                 maxCapacity: matchedRt?.max_capacity || property.max_guests || 4,
@@ -186,6 +222,16 @@ export async function POST(request: Request) {
 
     const startDateTime = new Date(breakdown.startDateTime);
     const endDateTime = new Date(breakdown.endDateTime);
+
+    if (unitId) {
+      const existingUnit = await prisma.inventoryUnit.findUnique({
+        where: { id: unitId },
+        select: { id: true },
+      });
+      if (!existingUnit) {
+        unitId = undefined;
+      }
+    }
 
     if (!unitId) {
       const availableUnits = await findAvailableUnits(roomType.id, startDateTime, endDateTime);
