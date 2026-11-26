@@ -616,41 +616,45 @@ export function AdminDashboardClient() {
                 </div>
 
                 <div className="space-y-3">
-                  {prop.roomTypes.map((rt: any) => (
-                    <div
-                      key={rt.id}
-                      className="p-4 rounded-[14px] bg-[#FAF9F4] border border-[#E6EAE2] space-y-2"
-                    >
-                      <div className="flex justify-between text-xs font-bold text-[#14251E]">
-                        <span>{rt.name}</span>
-                        <span className="text-[#5F6F67]">{rt.category}</span>
-                      </div>
+                  {(prop.roomTypes || []).length === 0 ? (
+                    <p className="text-xs text-[#5F6F67] py-2">No room types configured yet.</p>
+                  ) : (
+                    (prop.roomTypes || []).map((rt: any) => (
+                      <div
+                        key={rt.id}
+                        className="p-4 rounded-[14px] bg-[#FAF9F4] border border-[#E6EAE2] space-y-2"
+                      >
+                        <div className="flex justify-between text-xs font-bold text-[#14251E]">
+                          <span>{rt.name}</span>
+                          <span className="text-[#5F6F67]">{rt.category}</span>
+                        </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                        {rt.rooms.map((r: any) =>
-                          r.inventoryUnits.map((u: any) => (
-                            <div
-                              key={u.id}
-                              className={`p-2 rounded-[10px] border text-[11px] font-medium flex items-center justify-between ${
-                                u.status === "AVAILABLE"
-                                  ? "bg-white border-[#E6EAE2] text-[#14251E]"
-                                  : "bg-red-50 border-red-200 text-red-700"
-                              }`}
-                            >
-                              <span>{u.identifier}</span>
-                              <span
-                                className={`text-[10px] font-bold ${
-                                  u.status === "AVAILABLE" ? "text-[#009B69]" : "text-red-700"
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                          {(rt.rooms || []).flatMap((r: any) =>
+                            (r.inventoryUnits || []).map((u: any) => (
+                              <div
+                                key={u.id}
+                                className={`p-2 rounded-[10px] border text-[11px] font-medium flex items-center justify-between ${
+                                  u.status === "AVAILABLE"
+                                    ? "bg-white border-[#E6EAE2] text-[#14251E]"
+                                    : "bg-red-50 border-red-200 text-red-700"
                                 }`}
                               >
-                                {u.status === "AVAILABLE" ? "Available" : "Occupied"}
-                              </span>
-                            </div>
-                          ))
-                        )}
+                                <span>{u.identifier}</span>
+                                <span
+                                  className={`text-[10px] font-bold ${
+                                    u.status === "AVAILABLE" ? "text-[#009B69]" : "text-red-700"
+                                  }`}
+                                >
+                                  {u.status === "AVAILABLE" ? "Available" : "Occupied"}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             ))}
@@ -674,7 +678,7 @@ export function AdminDashboardClient() {
                 <div className="flex justify-between items-center pb-3 border-b border-[#EEF2EA]">
                   <div>
                     <h3 className="font-extrabold text-base text-[#14251E]">{rt.name}</h3>
-                    <p className="text-xs text-[#5F6F67]">{rt.property.name}</p>
+                    <p className="text-xs text-[#5F6F67]">{rt.property?.name || "Stayzy Residence"}</p>
                   </div>
                   <span className="text-xs font-bold px-3 py-1 rounded-[9999px] bg-[#E8F4DF] text-[#064B35]">
                     {rt.category}
@@ -682,7 +686,7 @@ export function AdminDashboardClient() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-                  {rt.ratePlans.map((rp: any) => (
+                  {(rt.ratePlans || []).map((rp: any) => (
                     <div
                       key={rp.id}
                       className="p-4 rounded-[14px] border border-[#E6EAE2] bg-[#FAF9F4] space-y-2 text-xs"
@@ -806,10 +810,10 @@ export function AdminDashboardClient() {
                   }
                   className="w-full h-10 px-3 rounded-[12px] border border-[#D4DCD0] bg-[#FAF9F4]"
                 >
-                  {properties.flatMap((p) =>
-                    p.roomTypes.flatMap((rt: any) =>
-                      rt.rooms.flatMap((r: any) =>
-                        r.inventoryUnits.map((u: any) => (
+                  {(properties || []).flatMap((p) =>
+                    (p.roomTypes || []).flatMap((rt: any) =>
+                      (rt.rooms || []).flatMap((r: any) =>
+                        (r.inventoryUnits || []).map((u: any) => (
                           <option key={u.id} value={u.id}>
                             {p.name} — {rt.name} — {u.identifier}
                           </option>
@@ -936,10 +940,10 @@ export function AdminDashboardClient() {
                   className="w-full h-10 px-3 rounded-[12px] border border-[#D4DCD0] bg-[#FAF9F4]"
                 >
                   <option value="">-- Choose Unit --</option>
-                  {properties.flatMap((p) =>
-                    p.roomTypes.flatMap((rt: any) =>
-                      rt.rooms.flatMap((r: any) =>
-                        r.inventoryUnits.map((u: any) => (
+                  {(properties || []).flatMap((p) =>
+                    (p.roomTypes || []).flatMap((rt: any) =>
+                      (rt.rooms || []).flatMap((r: any) =>
+                        (r.inventoryUnits || []).map((u: any) => (
                           <option key={u.id} value={u.id}>
                             {p.name} — {u.identifier}
                           </option>
