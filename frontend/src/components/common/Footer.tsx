@@ -377,9 +377,9 @@ export function Footer() {
             <div
               role="tablist"
               aria-label="Popular Stayzy Cities"
-              className="flex items-center gap-2 overflow-x-auto pb-1.5 md:pb-0 scrollbar-none"
+              className="flex items-center justify-start gap-2 pb-1.5 md:pb-0"
             >
-              {CITY_DIRECTORIES.map((c) => {
+              {CITY_DIRECTORIES.filter((c) => c.city === "Bengaluru").map((c) => {
                 const isActive = activeCityTab === c.city;
                 return (
                   <button
