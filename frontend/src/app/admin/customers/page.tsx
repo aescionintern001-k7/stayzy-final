@@ -127,14 +127,16 @@ export default function AdminCustomersPage() {
                       {c.name ? c.name[0].toUpperCase() : "U"}
                     </div>
                     <div>
-                      <h3 className="text-base font-extrabold text-[#123D2B]">{c.name}</h3>
+                      <h3 className="text-base font-extrabold text-[#123D2B]">{c.name || "Stayzy Resident"}</h3>
                       <span className="text-[11px] text-[#5E6E65]">
-                        Member since {new Date(c.createdAt).toLocaleDateString()}
+                        {c.createdAt
+                          ? `Member since ${new Date(c.createdAt).toLocaleDateString("en-IN")}`
+                          : "Stayzy Resident"}
                       </span>
                     </div>
                   </div>
 
-                  {c.activeStays > 0 ? (
+                  {(c.activeStays ?? 0) > 0 ? (
                     <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
                       Active Resident
                     </span>
@@ -148,26 +150,28 @@ export default function AdminCustomersPage() {
                 <div className="mt-4 space-y-1.5 text-xs text-[#5E6E65]">
                   <div className="flex items-center gap-2">
                     <Mail className="w-3.5 h-3.5 text-[#123D2B]" />
-                    <span>{c.email}</span>
+                    <span>{c.email || "—"}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-3.5 h-3.5 text-[#123D2B]" />
-                    <span>{c.phone}</span>
+                    <span>{c.phone || "Not provided"}</span>
                   </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-3 gap-2 p-3 rounded-2xl bg-[#FAF8F5] border border-[#E8E6DF] text-center text-xs">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#7B8B82] block">Bookings</span>
-                    <span className="font-bold text-[#123D2B]">{c.totalBookings}</span>
+                    <span className="font-bold text-[#123D2B]">{c.totalBookings ?? 0}</span>
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#7B8B82] block">Total Spent</span>
-                    <span className="font-bold text-[#123D2B]">₹{c.totalSpend.toLocaleString("en-IN")}</span>
+                    <span className="font-bold text-[#123D2B]">
+                      ₹{Number(c.totalSpend || 0).toLocaleString("en-IN")}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#7B8B82] block">Tickets</span>
-                    <span className="font-bold text-[#123D2B]">{c.ticketsCount}</span>
+                    <span className="font-bold text-[#123D2B]">{c.ticketsCount ?? 0}</span>
                   </div>
                 </div>
 
@@ -178,7 +182,7 @@ export default function AdminCustomersPage() {
                     </span>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#123D2B]">
-                        {c.recentBooking.roomType?.name}
+                        {c.recentBooking.roomType?.name || "Stayzy Suite"}
                       </span>
                       <Link
                         href={`/admin/bookings/${c.recentBooking.id}`}
@@ -192,7 +196,9 @@ export default function AdminCustomersPage() {
               </div>
 
               <div className="pt-3 border-t border-[#F0EDE4] flex items-center justify-between text-xs">
-                <span className="text-[#7B8B82] text-[10px] font-mono">UID: {c.id.slice(-8)}</span>
+                <span className="text-[#7B8B82] text-[10px] font-mono">
+                  UID: {c.id ? String(c.id).slice(-8) : "—"}
+                </span>
                 <a
                   href={`mailto:${c.email}`}
                   className="px-3 py-1.5 rounded-lg border border-[#D5D2C7] bg-white font-bold text-[#123D2B] hover:bg-[#FAF8F5]"
