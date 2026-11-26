@@ -68,7 +68,7 @@ const CITIES: CityItem[] = [
 
 export function CitySelectorStrip() {
   const router = useRouter();
-  const [activeCity, setActiveCity] = useState<string>("Bengaluru");
+  const [activeCity, setActiveCity] = useState<string | null>(null);
   const [hoveredCity, setHoveredCity] = useState<string | null>(null);
 
   const handleSelectCity = (city: CityItem) => {
@@ -146,30 +146,29 @@ export function CitySelectorStrip() {
           {CITIES.map((city) => {
             const isComingSoon = city.id !== "bengaluru";
             const isSelected = !isComingSoon && activeCity === city.name;
-            const isHovered = !isComingSoon && hoveredCity === city.name;
+            const isHovered = hoveredCity === city.name;
 
             return (
               <button
                 key={city.id}
                 type="button"
-                disabled={isComingSoon}
                 aria-disabled={isComingSoon}
                 onClick={() => handleSelectCity(city)}
-                onMouseEnter={() => {
-                  if (!isComingSoon) setHoveredCity(city.name);
+                onPointerEnter={(e) => {
+                  if (e.pointerType !== "touch") setHoveredCity(city.name);
                 }}
-                onMouseLeave={() => {
-                  if (!isComingSoon) setHoveredCity(null);
-                }}
+                onPointerLeave={() => setHoveredCity(null)}
+                onMouseEnter={() => setHoveredCity(city.name)}
+                onMouseLeave={() => setHoveredCity(null)}
                 onBlur={() => setHoveredCity((prev) => (prev === city.name ? null : prev))}
-                className={`group relative rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex flex-col items-center justify-between text-center transition-all duration-300 overflow-hidden border-[1.5px] bg-white ${
-                  isComingSoon
-                    ? "border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)] cursor-not-allowed"
-                    : isHovered
-                    ? "border-[#008F55] shadow-[0_12px_28px_rgba(0,143,85,0.16)] -translate-y-1.5 ring-1 ring-[#008F55]/25 cursor-pointer"
+                className={`group relative rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex flex-col items-center justify-between text-center transition-all duration-250 ease-out overflow-hidden border-[1.5px] bg-white ${
+                  isComingSoon ? "cursor-not-allowed" : "cursor-pointer"
+                } ${
+                  isHovered
+                    ? "border-[#008F55] shadow-[0_12px_28px_rgba(0,143,85,0.16)] -translate-y-1.5"
                     : isSelected
-                    ? "border-[#008F55] shadow-[0_10px_26px_rgba(0,143,85,0.13)] ring-1 ring-[#008F55]/25 cursor-pointer"
-                    : "border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)] cursor-pointer"
+                    ? "border-[#008F55]/75 shadow-[0_4px_16px_rgba(0,143,85,0.08)]"
+                    : "border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)]"
                 }`}
               >
                 {/* Sharp Top-Center COMING SOON Badge for Unavailable Cities */}
@@ -180,16 +179,24 @@ export function CitySelectorStrip() {
                   </span>
                 )}
 
+                {/* Subtle Selected Status Dot (only after user clicks a city, distinct from hover) */}
+                {isSelected && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-3 right-3 z-20 w-2 h-2 rounded-full bg-[#008F55] pointer-events-none"
+                  />
+                )}
+
                 {/* Card Content Wrapper (Blurred & Softened for Coming Soon Cities) */}
                 <div
                   className={`w-full flex flex-col items-center justify-between flex-1 ${
                     isComingSoon ? "blur-[2.5px] opacity-65 pointer-events-none select-none" : ""
                   }`}
                 >
-                  {/* Subtle Top Backdrop Gradient inside card */}
+                  {/* Subtle Top Backdrop Gradient inside card (intensifies ONLY on hover) */}
                   <div
-                    className={`absolute inset-x-0 top-0 h-32 pointer-events-none transition-opacity duration-300 ${
-                      isSelected || isHovered
+                    className={`absolute inset-x-0 top-0 h-32 pointer-events-none transition-opacity duration-250 ${
+                      isHovered
                         ? "bg-gradient-to-b from-[#EAF8F0] via-white/80 to-transparent opacity-100"
                         : "bg-gradient-to-b from-[#F2F9F5] via-white/60 to-transparent opacity-65"
                     }`}
@@ -200,7 +207,7 @@ export function CitySelectorStrip() {
                     <img
                       src={city.image}
                       alt={`${city.name} Landmark - ${city.landmark}`}
-                      className={`max-h-full max-w-full object-contain object-center transform transition-transform duration-300 ease-out drop-shadow-xs ${
+                      className={`max-h-full max-w-full object-contain object-center transform transition-transform duration-250 ease-out drop-shadow-xs ${
                         isHovered ? "scale-105" : "scale-100"
                       }`}
                       loading="lazy"
@@ -211,7 +218,7 @@ export function CitySelectorStrip() {
                   <div className="relative z-10 w-full flex flex-col items-center pt-0.5 pb-1">
                     <h3
                       className={`text-sm sm:text-base font-extrabold tracking-tight transition-colors duration-200 leading-snug ${
-                        isSelected || isHovered ? "text-[#008F55]" : "text-[#17212B]"
+                        isHovered ? "text-[#008F55]" : "text-[#17212B]"
                       }`}
                     >
                       {city.name}
@@ -223,14 +230,12 @@ export function CitySelectorStrip() {
                   </div>
                 </div>
 
-                {/* Bottom Emerald Accent Bar (Active for Bengaluru & on Hover) */}
-                {!isComingSoon && (
-                  <div
-                    className={`absolute inset-x-4 bottom-0 h-1 rounded-full bg-[#008F55] transition-all duration-300 ${
-                      isSelected || isHovered ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50"
-                    }`}
-                  />
-                )}
+                {/* Bottom Emerald Accent Bar (visible ONLY when mouse is over this card) */}
+                <div
+                  className={`absolute inset-x-4 bottom-0 h-1 rounded-full bg-[#008F55] transition-all duration-250 ${
+                    isHovered ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50"
+                  }`}
+                />
               </button>
             );
           })}
