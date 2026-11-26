@@ -498,13 +498,13 @@ export function AdminDashboardClient() {
                     filteredBookings.map((b) => (
                       <tr key={b.id} className="hover:bg-[#FAF9F4]/75 transition-colors">
                         <td className="py-3.5 px-4">
-                          <span className="inline-block px-2.5 py-1 rounded-[8px] bg-[#E8F4DF] text-[#064B35] font-mono font-bold text-[11px]">
+                          <span className="inline-block whitespace-nowrap px-2.5 py-1 rounded-[8px] bg-[#E8F4DF] text-[#064B35] font-mono font-bold text-[11px]">
                             {b.bookingReference}
                           </span>
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="font-bold text-[#14251E]">{b.guestName}</div>
-                          <div className="text-[11px] text-[#5F6F67]">{b.guestPhone}</div>
+                          <div className="text-[11px] text-[#5F6F67] whitespace-nowrap">{b.guestPhone}</div>
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="font-semibold text-[#14251E]">{b.roomType?.name}</div>
@@ -513,7 +513,7 @@ export function AdminDashboardClient() {
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="inline-block px-2.5 py-1 rounded-[8px] bg-[#EDF5E9] text-[#064B35] font-bold text-[11px]">
+                          <span className="inline-block whitespace-nowrap px-2.5 py-1 rounded-[8px] bg-[#EDF5E9] text-[#064B35] font-bold text-[11px]">
                             {b.durationType} ({b.durationCount})
                           </span>
                         </td>
@@ -564,7 +564,7 @@ export function AdminDashboardClient() {
                               <button
                                 type="button"
                                 onClick={() => handleUpdateStatus(b.id, "CHECKED_IN")}
-                                className="px-2.5 py-1.5 rounded-[8px] bg-[#064B35] text-white text-[11px] font-bold hover:bg-[#043827] cursor-pointer"
+                                className="whitespace-nowrap px-2.5 py-1.5 rounded-[8px] bg-[#064B35] text-white text-[11px] font-bold hover:bg-[#043827] cursor-pointer"
                               >
                                 Check-In
                               </button>
@@ -573,7 +573,7 @@ export function AdminDashboardClient() {
                               <button
                                 type="button"
                                 onClick={() => handleUpdateStatus(b.id, "CHECKED_OUT")}
-                                className="px-2.5 py-1.5 rounded-[8px] bg-[#4C5C54] text-white text-[11px] font-bold hover:bg-[#36463E] cursor-pointer"
+                                className="whitespace-nowrap px-2.5 py-1.5 rounded-[8px] bg-[#4C5C54] text-white text-[11px] font-bold hover:bg-[#36463E] cursor-pointer"
                               >
                                 Check-Out
                               </button>
