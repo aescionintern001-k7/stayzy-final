@@ -166,6 +166,28 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     return null;
   }
 
+  if (jwtToken && !jwtToken.includes(".") && jwtToken.startsWith("user_")) {
+    const validated = validateSessionToken(jwtToken);
+    if (validated) {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: validated.userId },
+        });
+        if (user) {
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            phone: user.phone,
+            role: backendRoleToFrontend(user.role),
+          };
+        }
+      } catch {
+        // Prisma offline or unavailable
+      }
+    }
+  }
+
   // Legacy session cookie only allowed in explicit demo mode outside production
   const isDemoMode =
     process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE === "true";
