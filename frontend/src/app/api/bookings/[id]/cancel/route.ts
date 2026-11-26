@@ -2,12 +2,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 import { backendBookingToFrontend } from "@/lib/api/adapters";
 
-const BACKEND_URL =
-  process.env.API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5000/api/v1";
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,7 +34,7 @@ export async function POST(
 
       if (token && token.includes(".")) {
         try {
-          const backendRes = await fetch(`${BACKEND_URL}/bookings/${id}/cancel`, {
+          const backendRes = await fetch(`${getServerBackendUrl()}/bookings/${id}/cancel`, {
             method: "PATCH",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -48,14 +46,25 @@ export async function POST(
           if (backendRes.ok) {
             const data = await backendRes.json();
             const b = data.data?.booking || data.data;
-            return NextResponse.json({
-              success: true,
-              booking: b ? backendBookingToFrontend(b) : null,
-              message: "Booking has been cancelled successfully.",
-              source: "express_backend",
-            });
+            return NextResponse.json(
+              {
+                success: true,
+                booking: b ? backendBookingToFrontend(b) : null,
+                message: "Booking has been cancelled successfully.",
+                source: "express_backend",
+              },
+              { headers: NO_STORE_HEADERS }
+            );
           }
-        } catch (backendErr) {
+
+          if ([400, 401, 403, 404, 409].includes(backendRes.status)) {
+            const errData = await backendRes.json().catch(() => ({}));
+            return NextResponse.json(
+              { error: errData.message || errData.error || "Unable to cancel booking." },
+              { status: backendRes.status, headers: NO_STORE_HEADERS }
+            );
+          }
+        } catch {
           console.warn("[Cancel Booking] Express backend cancel failed, falling back to local");
         }
       }
@@ -71,8 +80,16 @@ export async function POST(
       return NextResponse.json({ error: "Booking not found." }, { status: 404 });
     }
 
-    if (user.role !== "ADMIN" && booking.userId !== user.id && booking.guestEmail !== user.email) {
-      return NextResponse.json({ error: "Access denied." }, { status: 403 });
+    const isAdmin = user.role === "ADMIN";
+    const isOwner =
+      booking.userId === user.id ||
+      (!!booking.guestEmail &&
+        booking.guestEmail.toLowerCase() === user.email.toLowerCase());
+    if (!isAdmin && !isOwner) {
+      return NextResponse.json(
+        { error: "Access denied." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
     }
 
     if (booking.status === "CANCELLED") {
@@ -129,7 +146,8 @@ export async function POST(
       message: `Booking has been cancelled. Refund of ₹${eligibleRefund.toLocaleString("en-IN")} requested.`,
       source: "local_prisma",
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to cancel booking.";
+    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

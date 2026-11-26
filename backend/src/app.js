@@ -33,6 +33,16 @@ const openapiDocument = YAML.load(path.join(__dirname, "../docs/openapi.yaml"));
 
 const app = express();
 
+// Trust first reverse proxy hop (Render/Railway/Fly/Nginx) for accurate rate limiting
+app.set("trust proxy", 1);
+
+// Prevent caching of personalized or security-sensitive API responses across sessions
+const noStorePrivate = (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, private");
+  res.setHeader("Vary", "Authorization, Cookie");
+  next();
+};
+
 // Security
 app.use(securityMiddleware);
 
@@ -51,13 +61,13 @@ app.use(cookieParser());
 app.use(globalRateLimiter);
 
 // Module routes
-app.use(`${env.API_PREFIX}/auth`, authRoutes);
-app.use(`${env.API_PREFIX}/users`, userRoutes);
+app.use(`${env.API_PREFIX}/auth`, noStorePrivate, authRoutes);
+app.use(`${env.API_PREFIX}/users`, noStorePrivate, userRoutes);
 app.use(`${env.API_PREFIX}/properties`, propertyRoutes);
-app.use(`${env.API_PREFIX}/bookings`, bookingRoutes);
-app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
+app.use(`${env.API_PREFIX}/bookings`, noStorePrivate, bookingRoutes);
+app.use(`${env.API_PREFIX}/payments`, noStorePrivate, paymentRoutes);
 app.use(`${env.API_PREFIX}/reviews`, reviewRoutes);
-app.use(`${env.API_PREFIX}/admin`, adminRoutes);
+app.use(`${env.API_PREFIX}/admin`, noStorePrivate, adminRoutes);
 
 // Health endpoint
 app.use(healthRoutes);

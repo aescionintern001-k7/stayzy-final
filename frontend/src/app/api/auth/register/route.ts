@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import {
-  createSessionToken,
-  hashPassword,
-  JWT_COOKIE_NAME,
-  LEGACY_SESSION_COOKIE_NAME,
-} from "@/lib/auth";
+import { JWT_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 import { backendRoleToFrontend } from "@/lib/api/adapters";
 
-const BACKEND_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
 
 export async function POST(request: Request) {
   try {
@@ -18,119 +13,85 @@ export async function POST(request: Request) {
     if (!name || !email || !password) {
       return NextResponse.json(
         { error: "Please provide your full name, email, and a password." },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    const cleanEmail = email.toLowerCase().trim();
+    const cleanEmail = String(email).toLowerCase().trim();
+    const backendUrl = getServerBackendUrl();
 
-    // 1. Try authoritative Express backend first
+    let backendRes: Response;
     try {
-      const backendRes = await fetch(`${BACKEND_URL}/auth/register`, {
+      backendRes = await fetch(`${backendUrl}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: name.trim(),
+          full_name: String(name).trim(),
           email: cleanEmail,
           password,
           role: "guest",
         }),
+        cache: "no-store",
       });
-
-      if (backendRes.ok) {
-        // Auto-login to obtain JWT
-        const loginRes = await fetch(`${BACKEND_URL}/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: cleanEmail, password }),
-        });
-
-        if (loginRes.ok) {
-          const loginData = await loginRes.json();
-          const { token, user } = loginData.data || {};
-
-          const response = NextResponse.json({
-            success: true,
-            user: {
-              id: user.id,
-              name: user.full_name || name,
-              email: user.email,
-              phone: user.phone || phone || null,
-              role: backendRoleToFrontend(user.role),
-            },
-            token,
-            message: "Registration successful!",
-          });
-
-          response.cookies.set(JWT_COOKIE_NAME, token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            path: "/",
-            maxAge: 60 * 60 * 24 * 7,
-            sameSite: "lax",
-          });
-
-          response.cookies.set(LEGACY_SESSION_COOKIE_NAME, token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            path: "/",
-            maxAge: 60 * 60 * 24 * 7,
-            sameSite: "lax",
-          });
-
-          return response;
-        }
-      } else if (backendRes.status === 409) {
-        return NextResponse.json(
-          { error: "An account with this email already exists. Please log in instead." },
-          { status: 409 }
-        );
-      } else if (backendRes.status === 400) {
-        const errData = await backendRes.json().catch(() => ({}));
-        return NextResponse.json(
-          { error: errData.message || "Invalid registration data." },
-          { status: 400 }
-        );
-      }
-    } catch (backendError) {
-      console.warn("[Auth Register] Express backend unreachable, falling back to local database");
-    }
-
-    // 2. Local fallback
-    const existing = await prisma.user.findUnique({
-      where: { email: cleanEmail },
-    });
-
-    if (existing) {
+    } catch {
       return NextResponse.json(
-        { error: "An account with this email already exists. Please log in instead." },
-        { status: 409 }
+        { error: "Registration service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
       );
     }
 
-    const newUser = await prisma.user.create({
-      data: {
-        email: cleanEmail,
-        name: name.trim(),
-        phone: phone ? phone.trim() : null,
-        role: "CUSTOMER",
-        passwordHash: hashPassword(password),
-      },
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      const status = backendRes.status === 409 ? 409 : backendRes.status >= 400 ? backendRes.status : 400;
+      return NextResponse.json(
+        {
+          error:
+            status === 409
+              ? "An account with this email already exists. Please log in instead."
+              : errData.message || errData.error || "Invalid registration data.",
+        },
+        { status, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const loginRes = await fetch(`${backendUrl}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: cleanEmail, password }),
+      cache: "no-store",
     });
 
-    const token = createSessionToken(newUser);
+    if (!loginRes.ok) {
+      return NextResponse.json(
+        { error: "Account created, please log in with your email and password." },
+        { status: 201, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    const response = NextResponse.json({
-      success: true,
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: "CUSTOMER",
+    const loginData = await loginRes.json();
+    const { token, user } = loginData.data || {};
+    if (!token || !user) {
+      return NextResponse.json(
+        { error: "Account created, please log in." },
+        { status: 201, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const response = NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: user.id,
+          name: user.full_name || name,
+          email: user.email,
+          phone: user.phone || phone || null,
+          role: backendRoleToFrontend(user.role),
+        },
+        token,
+        message: "Registration successful!",
       },
-      message: "Registration successful!",
-    });
+      { headers: NO_STORE_HEADERS }
+    );
 
     response.cookies.set(JWT_COOKIE_NAME, token, {
       httpOnly: true,
@@ -139,17 +100,13 @@ export async function POST(request: Request) {
       maxAge: 60 * 60 * 24 * 7,
       sameSite: "lax",
     });
-
-    response.cookies.set(LEGACY_SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-      sameSite: "lax",
-    });
+    response.cookies.delete(LEGACY_SESSION_COOKIE_NAME);
 
     return response;
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || "Unable to register." },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

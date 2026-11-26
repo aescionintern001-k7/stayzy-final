@@ -64,7 +64,7 @@ export default function OwnerLayout({
   useEffect(() => {
     async function checkAuth() {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (data.user) {
@@ -72,24 +72,21 @@ export default function OwnerLayout({
             return;
           }
         }
-        const stored = typeof window !== "undefined" ? localStorage.getItem("stayzy_user") : null;
-        if (stored) {
-          setUser(JSON.parse(stored));
-        } else {
-          setUser({
-            id: "usr-owner-001",
-            email: "rajesh.pg@stayzy.com",
-            role: "OWNER",
-            name: "Rajesh Kumar (PG Partner)",
-          });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("stayzy_user");
+          localStorage.removeItem("stayzy_jwt_token");
+          localStorage.removeItem("stayzy_token");
+          window.dispatchEvent(new Event("stayzy_auth_changed"));
         }
+        router.replace(`/login?redirect=${encodeURIComponent(pathname || "/owner")}`);
       } catch {
-        setUser({
-          id: "usr-owner-001",
-          email: "rajesh.pg@stayzy.com",
-          role: "OWNER",
-          name: "Rajesh Kumar (PG Partner)",
-        });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("stayzy_user");
+          localStorage.removeItem("stayzy_jwt_token");
+          localStorage.removeItem("stayzy_token");
+          window.dispatchEvent(new Event("stayzy_auth_changed"));
+        }
+        router.replace(`/login?redirect=${encodeURIComponent(pathname || "/owner")}`);
       } finally {
         setLoading(false);
       }
@@ -100,33 +97,14 @@ export default function OwnerLayout({
   const handleLogout = async () => {
     setProfileMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-  };
-
-  const handleSwitchToOwner = async () => {
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "stayzy_user",
-          JSON.stringify({
-            id: "usr-owner-001",
-            email: "rajesh.pg@stayzy.com",
-            name: "Rajesh Kumar (PG Partner)",
-            phone: "+91 98450 88990",
-            role: "OWNER",
-          })
-        );
-      }
-      await fetch("/api/auth/switch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "OWNER" }),
-      });
-      window.location.reload();
-    } catch (e) {
-      console.error(e);
-      window.location.reload();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("stayzy_user");
+      localStorage.removeItem("stayzy_jwt_token");
+      localStorage.removeItem("stayzy_token");
+      window.dispatchEvent(new Event("stayzy_auth_changed"));
     }
+    router.push("/login");
+    router.refresh();
   };
 
   if (loading) {
@@ -135,6 +113,10 @@ export default function OwnerLayout({
         Loading Stayzy Property Partner Portal...
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   if (user && user.role !== "OWNER" && user.role !== "ADMIN") {
@@ -147,17 +129,16 @@ export default function OwnerLayout({
             </div>
             <h2 className="text-2xl font-extrabold text-[#17251F]">Property Owner Access</h2>
             <p className="text-xs text-[#5F6F67] leading-relaxed">
-              You are currently viewing with <strong>{user.role}</strong> permissions ({user.email}). Switch to Property Partner mode to upload and manage your PG buildings.
+              You are currently signed in with <strong>{user.role}</strong> permissions ({user.email}). Sign in with a Property Partner account to manage PG buildings.
             </p>
             <div className="pt-2 space-y-2.5">
-              <button
-                type="button"
-                onClick={handleSwitchToOwner}
+              <Link
+                href="/login?redirect=/owner"
                 className="w-full py-3 rounded-[12px] bg-[#064B35] text-white text-xs font-bold hover:bg-[#043827] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
               >
                 <Building2 className="w-4 h-4 text-[#E8F4DF]" />
-                <span>Enter as Property Owner</span>
-              </button>
+                <span>Sign In as Property Partner</span>
+              </Link>
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Link
                   href="/admin"

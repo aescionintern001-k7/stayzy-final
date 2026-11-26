@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 import crypto from "crypto";
-import { backendRoleToFrontend } from "./api/adapters";
+import { backendRoleToFrontend, backendUserToFrontend } from "./api/adapters";
+import { getServerBackendUrl } from "./api/config";
 import { FrontendRole } from "./api/types";
 
 export interface SessionUser {
@@ -28,17 +29,29 @@ export function hashPassword(password: string): string {
  * Also supports demo default passwords in development.
  */
 export function verifyPassword(password: string, storedHash?: string | null): boolean {
-  if (!storedHash) return false;
-  if (storedHash === password || storedHash === hashPassword(password)) return true;
-  if (password === "password123" || password === "admin123" || password === "AdminPassword123!") return true;
+  if (!storedHash || !password) return false;
+  if (storedHash === hashPassword(password)) return true;
+  if (process.env.NODE_ENV !== "production" && storedHash === password) return true;
   return false;
 }
 
+function getAuthSecret(): string | null {
+  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (process.env.NODE_ENV !== "production") {
+    return "stayzy_dev_auth_secret_local_only";
+  }
+  return null;
+}
+
 /**
- * Create session token string for legacy fallback: `user_<id>_<role>_<hmac>`
+ * Create session token string for legacy dev fallback: `user_<id>_<role>_<hmac>`
  */
 export function createSessionToken(user: { id: string; role: string }): string {
-  const secret = process.env.AUTH_SECRET || "stayzy_super_secret_jwt_key_2026";
+  const secret = getAuthSecret();
+  if (!secret) {
+    throw new Error("AUTH_SECRET is not configured.");
+  }
   const signature = crypto.createHmac("sha256", secret).update(`${user.id}:${user.role}`).digest("hex");
   return `user_${user.id}_${user.role}_${signature}`;
 }
@@ -48,16 +61,21 @@ export function createSessionToken(user: { id: string; role: string }): string {
  */
 export function validateSessionToken(token: string): { userId: string; role: string } | null {
   try {
+    const secret = getAuthSecret();
+    if (!secret) return null;
+
     const parts = token.split("_");
     if (parts.length < 4 || parts[0] !== "user") return null;
     const userId = parts[1];
     const role = parts[2];
     const signature = parts[3];
 
-    const secret = process.env.AUTH_SECRET || "stayzy_super_secret_jwt_key_2026";
     const expected = crypto.createHmac("sha256", secret).update(`${userId}:${role}`).digest("hex");
+    const sigBuf = Buffer.from(signature, "utf8");
+    const expBuf = Buffer.from(expected, "utf8");
+    if (sigBuf.length !== expBuf.length) return null;
 
-    if (signature === expected) {
+    if (crypto.timingSafeEqual(sigBuf, expBuf)) {
       return { userId, role };
     }
     return null;
@@ -67,46 +85,94 @@ export function validateSessionToken(token: string): { userId: string; role: str
 }
 
 /**
- * Safely parse a JWT token payload without throwing
+ * Cryptographically verify an HS256 JWT token using JWT_SECRET.
+ * Fails closed when JWT_SECRET is not configured or signature/exp/sub is invalid.
  */
-export function decodeJwtPayload(token: string): any | null {
+export function verifyJwtPayload(token: string): Record<string, any> | null {
   try {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return null;
+
     const parts = token.split(".");
     if (parts.length !== 3) return null;
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = Buffer.from(base64, "base64").toString("utf8");
-    return JSON.parse(jsonPayload);
+
+    const [headerB64, payloadB64, signatureB64] = parts;
+    const header = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf8"));
+    if (!header || header.alg !== "HS256") return null;
+
+    const expectedSig = crypto
+      .createHmac("sha256", secret)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest("base64")
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+    const sigBuf = Buffer.from(signatureB64, "utf8");
+    const expBuf = Buffer.from(expectedSig, "utf8");
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return null;
+    }
+
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    if (!payload || !payload.sub) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp <= now) return null;
+    return payload;
   } catch {
     return null;
   }
 }
 
 /**
- * Get the currently authenticated user from JWT or session cookie.
- * Prioritizes the authoritative Express backend JWT token.
+ * Get the currently authenticated user from verified JWT or dev-only session cookie.
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
   const jwtToken = cookieStore.get(JWT_COOKIE_NAME)?.value || cookieStore.get("token")?.value;
 
-  if (jwtToken) {
-    const payload = decodeJwtPayload(jwtToken);
+  if (jwtToken && jwtToken.includes(".")) {
+    const payload = verifyJwtPayload(jwtToken);
     if (payload && payload.sub) {
-      const now = Math.floor(Date.now() / 1000);
-      if (!payload.exp || payload.exp > now) {
-        return {
-          id: payload.sub,
-          email: payload.email || "",
-          name: payload.name || payload.full_name || payload.email?.split("@")[0] || "Stayzy Resident",
-          phone: payload.phone || null,
-          role: backendRoleToFrontend(payload.role),
-        };
+      return {
+        id: payload.sub,
+        email: payload.email || "",
+        name: payload.name || payload.full_name || payload.email?.split("@")[0] || "Stayzy Resident",
+        phone: payload.phone || null,
+        role: backendRoleToFrontend(payload.role),
+      };
+    }
+
+    // If JWT_SECRET is only on Express backend, verify via Express /auth/me
+    if (!process.env.JWT_SECRET) {
+      try {
+        const res = await fetch(`${getServerBackendUrl()}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${jwtToken}`,
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.data?.user) {
+            return backendUserToFrontend(data.data.user);
+          }
+        }
+      } catch {
+        // Backend unreachable — fail closed
       }
     }
+    return null;
   }
 
-  // Fallback to legacy session cookie
+  // Legacy session cookie only allowed in explicit demo mode outside production
+  const isDemoMode =
+    process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  if (!isDemoMode) {
+    return null;
+  }
+
   const sessionToken = cookieStore.get(LEGACY_SESSION_COOKIE_NAME)?.value;
   if (!sessionToken) {
     return null;

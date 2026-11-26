@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import {
-  createSessionToken,
-  verifyPassword,
-  JWT_COOKIE_NAME,
-  LEGACY_SESSION_COOKIE_NAME,
-} from "@/lib/auth";
+import { JWT_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 import { backendRoleToFrontend } from "@/lib/api/adapters";
 
-const BACKEND_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
 
 export async function POST(request: Request) {
   try {
@@ -16,185 +11,118 @@ export async function POST(request: Request) {
     const { email, phone, password, demoType, requiredRole, rememberMe } = body;
 
     const cookieMaxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
+    const isDemoAllowed =
+      process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
-    // Handle demo logins if requested
-    let targetEmail = email ? email.toLowerCase().trim() : "";
-    let targetPhoneDigits = phone ? String(phone).replace(/\D/g, "") : "";
-    if (targetPhoneDigits.length > 10) {
-      targetPhoneDigits = targetPhoneDigits.slice(-10);
-    }
-    let targetPassword = password;
+    let targetEmail = email ? String(email).toLowerCase().trim() : "";
+    let targetPassword = password ? String(password) : "";
 
-    if (demoType === "admin") {
-      targetEmail = "admin@stayzy.com";
-      targetPassword = "AdminPassword123!";
-    } else if (demoType === "customer") {
-      targetEmail = "aarav.sharma@example.com";
-      targetPassword = "password123";
-    }
-
-    // 1. Try authoritative Express backend first when logging in via email
-    if (targetEmail) {
-      try {
-        const backendRes = await fetch(`${BACKEND_URL}/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: targetEmail, password: targetPassword }),
-        });
-
-        if (backendRes.ok) {
-          const data = await backendRes.json();
-          const { token, user } = data.data || {};
-
-          if (token && user) {
-            const frontendRole = backendRoleToFrontend(user.role);
-
-            if (requiredRole === "ADMIN" && frontendRole !== "ADMIN") {
-              return NextResponse.json(
-                { error: "Access denied. This account does not possess administrator credentials." },
-                { status: 403 }
-              );
-            }
-
-            const response = NextResponse.json({
-              success: true,
-              user: {
-                id: user.id,
-                name: user.full_name || user.name,
-                email: user.email,
-                phone: user.phone || null,
-                role: frontendRole,
-              },
-              token,
-            });
-
-            response.cookies.set(JWT_COOKIE_NAME, token, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-              path: "/",
-              maxAge: cookieMaxAge,
-              sameSite: "lax",
-            });
-
-            response.cookies.set(LEGACY_SESSION_COOKIE_NAME, token, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-              path: "/",
-              maxAge: cookieMaxAge,
-              sameSite: "lax",
-            });
-
-            return response;
-          }
-        } else if (backendRes.status === 401 || backendRes.status === 400 || backendRes.status === 403) {
-          const errData = await backendRes.json().catch(() => ({}));
-          if (!demoType) {
-            return NextResponse.json(
-              { error: errData.message || "Invalid email address or password." },
-              { status: backendRes.status }
-            );
-          }
-        }
-      } catch {
-        console.warn("[Auth Login] Express backend not reachable, using local fallback");
-      }
-    }
-
-    // 2. Local Prisma database authentication (email or phone)
-    let user: any = null;
-
-    if (demoType === "customer") {
-      user = await prisma.user.findFirst({
-        where: { role: "CUSTOMER" },
-      });
-    } else if (demoType === "admin") {
-      user = await prisma.user.findFirst({
-        where: { role: "ADMIN" },
-      });
-    } else if (targetPhoneDigits) {
-      if (targetPhoneDigits.length < 10 || !targetPassword) {
+    if (demoType) {
+      if (!isDemoAllowed) {
         return NextResponse.json(
-          { error: "Please enter a valid phone number and password." },
-          { status: 400 }
+          { error: "Demo login is disabled in this environment." },
+          { status: 403, headers: NO_STORE_HEADERS }
         );
       }
-
-      const candidates = await prisma.user.findMany({
-        where: { phone: { not: null } },
-      });
-      user =
-        candidates.find(
-          (u) => (u.phone || "").replace(/\D/g, "").slice(-10) === targetPhoneDigits
-        ) || null;
-
-      if (!user || !verifyPassword(targetPassword, user.passwordHash)) {
-        return NextResponse.json(
-          { error: "Invalid phone number or password." },
-          { status: 401 }
-        );
-      }
-    } else {
-      if (!targetEmail || !targetPassword) {
-        return NextResponse.json(
-          { error: "Please enter your email and password." },
-          { status: 400 }
-        );
-      }
-
-      user = await prisma.user.findUnique({
-        where: { email: targetEmail },
-      });
-
-      if (!user || !verifyPassword(targetPassword, user.passwordHash)) {
-        return NextResponse.json(
-          { error: "Invalid email address or password." },
-          { status: 401 }
-        );
+      if (demoType === "admin") {
+        targetEmail = "admin@stayzy.com";
+        targetPassword = "AdminPassword123!";
+      } else if (demoType === "customer") {
+        targetEmail = "aarav.sharma@example.com";
+        targetPassword = "password123";
+      } else if (demoType === "owner") {
+        targetEmail = "host@stayzy.com";
+        targetPassword = "password123";
       }
     }
 
-    if (!user) {
-      return NextResponse.json({ error: "User profile not found." }, { status: 404 });
-    }
-
-    if (requiredRole === "ADMIN" && user.role !== "ADMIN") {
+    if (!targetEmail && phone) {
       return NextResponse.json(
-        { error: "Access denied. This account does not possess administrator credentials." },
-        { status: 403 }
+        { error: "Phone password login requires an email-linked account on the shared backend." },
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    const legacyToken = createSessionToken(user);
+    if (!targetEmail || !targetPassword) {
+      return NextResponse.json(
+        { error: "Please enter your email and password." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    const response = NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: targetEmail, password: targetPassword }),
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Authentication service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      const errRes = NextResponse.json(
+        { error: errData.message || errData.error || "Invalid email address or password." },
+        { status: backendRes.status >= 400 ? backendRes.status : 401, headers: NO_STORE_HEADERS }
+      );
+      errRes.cookies.delete(JWT_COOKIE_NAME);
+      errRes.cookies.delete("token");
+      errRes.cookies.delete(LEGACY_SESSION_COOKIE_NAME);
+      return errRes;
+    }
+
+    const data = await backendRes.json();
+    const { token, user } = data.data || {};
+    if (!token || !user) {
+      return NextResponse.json(
+        { error: "Invalid authentication response from backend." },
+        { status: 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const frontendRole = backendRoleToFrontend(user.role);
+    if (requiredRole === "ADMIN" && frontendRole !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Access denied. This account does not possess administrator credentials." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const response = NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: user.id,
+          name: user.full_name || user.name,
+          email: user.email,
+          phone: user.phone || null,
+          role: frontendRole,
+        },
+        token,
       },
-    });
+      { headers: NO_STORE_HEADERS }
+    );
 
-    response.cookies.set(JWT_COOKIE_NAME, legacyToken, {
+    response.cookies.set(JWT_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: cookieMaxAge,
       sameSite: "lax",
     });
-
-    response.cookies.set(LEGACY_SESSION_COOKIE_NAME, legacyToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: cookieMaxAge,
-      sameSite: "lax",
-    });
+    response.cookies.delete(LEGACY_SESSION_COOKIE_NAME);
 
     return response;
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || "Unable to sign in." },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

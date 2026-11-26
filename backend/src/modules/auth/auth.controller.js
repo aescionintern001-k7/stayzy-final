@@ -1,9 +1,10 @@
-﻿import { registerUser, loginUser } from "./auth.service.js";
+import { registerUser, loginUser } from "./auth.service.js";
 
 export const register = async (req, res, next) => {
   try {
     const user = await registerUser(req.body);
 
+    res.set("Cache-Control", "no-store, private");
     res.status(201).json({
       success: true,
       message: "Registration successful",
@@ -18,6 +19,7 @@ export const login = async (req, res, next) => {
   try {
     const result = await loginUser(req.body);
 
+    res.set("Cache-Control", "no-store, private");
     res.status(200).json({
       success: true,
       message: "Login successful",
@@ -29,6 +31,7 @@ export const login = async (req, res, next) => {
 };
 
 export const getProfile = (req, res) => {
+  res.set("Cache-Control", "no-store, private");
   res.status(200).json({
     success: true,
     message: "Authenticated user profile",

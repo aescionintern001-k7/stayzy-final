@@ -69,7 +69,7 @@ export default function DashboardLayout({
   useEffect(() => {
     async function loadUser() {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (data.user) {
@@ -77,30 +77,21 @@ export default function DashboardLayout({
             return;
           }
         }
-        const stored = typeof window !== "undefined" ? localStorage.getItem("stayzy_user") : null;
-        if (stored) {
-          setUser(JSON.parse(stored));
-        } else {
-          const defaultUser = {
-            id: "usr-customer-001",
-            email: "aarav.sharma@example.com",
-            name: "Aarav Sharma",
-            phone: "+91 98765 12345",
-            role: "CUSTOMER",
-          };
-          if (typeof window !== "undefined") {
-            localStorage.setItem("stayzy_user", JSON.stringify(defaultUser));
-          }
-          setUser(defaultUser);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("stayzy_user");
+          localStorage.removeItem("stayzy_jwt_token");
+          localStorage.removeItem("stayzy_token");
+          window.dispatchEvent(new Event("stayzy_auth_changed"));
         }
+        router.replace(`/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`);
       } catch {
-        setUser({
-          id: "usr-customer-001",
-          email: "aarav.sharma@example.com",
-          name: "Aarav Sharma",
-          phone: "+91 98765 12345",
-          role: "CUSTOMER",
-        });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("stayzy_user");
+          localStorage.removeItem("stayzy_jwt_token");
+          localStorage.removeItem("stayzy_token");
+          window.dispatchEvent(new Event("stayzy_auth_changed"));
+        }
+        router.replace(`/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`);
       } finally {
         setLoading(false);
       }
@@ -111,6 +102,12 @@ export default function DashboardLayout({
   const handleLogout = async () => {
     setProfileMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" });
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("stayzy_user");
+      localStorage.removeItem("stayzy_jwt_token");
+      localStorage.removeItem("stayzy_token");
+      window.dispatchEvent(new Event("stayzy_auth_changed"));
+    }
     router.push("/login");
     router.refresh();
   };
@@ -121,6 +118,10 @@ export default function DashboardLayout({
         Loading your resident dashboard...
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (

@@ -11,11 +11,16 @@ export const envSchema = z
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
     JWT_EXPIRES_IN: z.string().default("1d"),
     CORS_ORIGIN: z.string().default("http://localhost:3000"),
+    DATABASE_URL: z.string().optional(),
+    DB_SSL: z
+      .union([z.boolean(), z.string()])
+      .optional()
+      .transform((val) => val === true || val === "true"),
     DB_HOST: z.string().default("localhost"),
     DB_PORT: z.coerce.number().int().positive().default(5432),
     DB_NAME: z.string().min(1).default("stayzy_dev"),
     DB_USER: z.string().min(1).default("postgres"),
-    DB_PASSWORD: z.string().min(1, "Database password is required"),
+    DB_PASSWORD: z.string().optional(),
     DB_POOL_MAX: z.coerce.number().int().positive().default(10),
     DB_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
     DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
@@ -36,6 +41,13 @@ export const envSchema = z
     return data;
   })
   .superRefine((data, ctx) => {
+    if (!data.DATABASE_URL && (!data.DB_PASSWORD || data.DB_PASSWORD.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["DB_PASSWORD"],
+        message: "DB_PASSWORD is required when DATABASE_URL is not set",
+      });
+    }
     // In production, prevent silent use of missing or mock fallback credentials
     if (data.NODE_ENV === "production") {
       if (!data.RAZORPAY_KEY_ID || data.RAZORPAY_KEY_ID.startsWith("rzp_test_stayzy")) {

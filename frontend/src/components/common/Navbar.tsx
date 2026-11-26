@@ -77,22 +77,44 @@ export function Navbar() {
   }, [pathname]);
 
   // Detect current role from URL or localStorage
+  // Resolve current role from authoritative /api/auth/me session
   useEffect(() => {
-    if (pathname.startsWith("/admin")) {
-      setCurrentRole("ADMIN");
-    } else if (pathname.startsWith("/owner")) {
-      setCurrentRole("OWNER");
-    } else if (pathname.startsWith("/dashboard")) {
-      setCurrentRole("CUSTOMER");
-    } else {
-      const stored = typeof window !== "undefined" ? localStorage.getItem("stayzy_user") : null;
-      if (stored) {
-        try {
-          const u = JSON.parse(stored);
-          if (u?.role) setCurrentRole(u.role);
-        } catch {}
+    let active = true;
+
+    async function syncSessionRole() {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (!active) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user?.role) {
+            setCurrentRole(data.user.role);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("stayzy_user", JSON.stringify(data.user));
+            }
+            return;
+          }
+        }
+        setCurrentRole(null);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("stayzy_user");
+          localStorage.removeItem("stayzy_jwt_token");
+          localStorage.removeItem("stayzy_token");
+        }
+      } catch {
+        if (active) setCurrentRole(null);
       }
     }
+
+    syncSessionRole();
+    const handleAuthChanged = () => {
+      syncSessionRole();
+    };
+    window.addEventListener("stayzy_auth_changed", handleAuthChanged);
+    return () => {
+      active = false;
+      window.removeEventListener("stayzy_auth_changed", handleAuthChanged);
+    };
   }, [pathname]);
 
   // Click outside and Escape key to close any open dropdowns
@@ -126,56 +148,28 @@ export function Navbar() {
     setMobileMenuOpen(false);
   };
 
-  // Demo Persona Quick-Switch
+  // Navigate to authenticated portal or login flow (never spoof roles in localStorage)
   const handleRoleLogin = async (role: "CUSTOMER" | "OWNER" | "ADMIN") => {
     try {
       setSwitching(true);
-      const demoUserMap: Record<string, any> = {
-        CUSTOMER: {
-          id: "usr-customer-001",
-          email: "aarav.sharma@example.com",
-          name: "Aarav Sharma",
-          phone: "+91 98765 12345",
-          role: "CUSTOMER",
-        },
-        OWNER: {
-          id: "usr-owner-001",
-          email: "rajesh.pg@stayzy.com",
-          name: "Rajesh Kumar (PG Partner)",
-          phone: "+91 98450 88990",
-          role: "OWNER",
-        },
-        ADMIN: {
-          id: "usr-admin-001",
-          email: "admin@stayzy.com",
-          name: "Stayzy Lead Admin",
-          phone: "+91 80 4567 8900",
-          role: "ADMIN",
-        },
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("stayzy_user", JSON.stringify(demoUserMap[role]));
-        setCurrentRole(role);
-      }
-
       closeAllMenus();
 
-      toast.success(
-        "Persona Activated",
-        role === "ADMIN"
-          ? "Switched to Super Admin console"
-          : role === "OWNER"
-          ? "Switched to PG Host portal (Rajesh)"
-          : "Switched to Resident view (Aarav)"
-      );
+      const targetPath =
+        role === "ADMIN" ? "/admin" : role === "OWNER" ? "/owner" : "/dashboard";
+
+      if (
+        (role === "ADMIN" && currentRole === "ADMIN") ||
+        (role === "OWNER" && (currentRole === "OWNER" || currentRole === "ADMIN")) ||
+        (role === "CUSTOMER" && currentRole !== null)
+      ) {
+        router.push(targetPath);
+        return;
+      }
 
       if (role === "ADMIN") {
-        router.push("/admin");
-      } else if (role === "OWNER") {
-        router.push("/owner");
+        router.push("/admin/login");
       } else {
-        router.push("/dashboard");
+        router.push(`/login?redirect=${encodeURIComponent(targetPath)}`);
       }
     } finally {
       setSwitching(false);

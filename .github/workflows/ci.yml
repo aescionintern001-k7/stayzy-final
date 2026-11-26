@@ -1,0 +1,129 @@
+name: Stayzy CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - "dev/**"
+      - "feature/**"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-ci:
+    name: Backend Tests & Security Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: stayzy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --workspaces=false
+
+      - name: Run dependency security audit
+        run: npm audit --audit-level=critical
+
+      - name: Run database migrations and seed test data
+        run: |
+          npm run migrate
+          npm run seed
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: stayzy_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres_ci_password
+          JWT_SECRET: ci_test_jwt_secret_minimum_32_characters_long_12345
+
+      - name: Run backend unit, integration & cross-user auth tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          PORT: 5000
+          API_PREFIX: /api/v1
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: stayzy_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres_ci_password
+          JWT_SECRET: ci_test_jwt_secret_minimum_32_characters_long_12345
+          JWT_EXPIRES_IN: 1d
+          CORS_ORIGIN: http://localhost:3000
+
+  frontend-ci:
+    name: Frontend TypeCheck, Lint & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm install --workspaces=false --no-package-lock
+
+      - name: Generate Prisma Client & Push SQLite CI Schema
+        run: |
+          npx prisma generate
+          npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: "file:./dev.db"
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: ESLint check
+        run: npx eslint src --quiet
+
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          DATABASE_URL: "file:./dev.db"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          NEXT_PUBLIC_API_BASE_URL: "http://localhost:5000/api/v1"
+          NEXT_PUBLIC_DEMO_MODE: "false"

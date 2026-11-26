@@ -1,4 +1,4 @@
-﻿import bcrypt from "bcrypt";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "../../database/pool.js";
 import { env } from "../../config/env.js";
@@ -6,9 +6,11 @@ import { env } from "../../config/env.js";
 // REGISTER
 export const registerUser = async ({ full_name, email, password, role = "guest" }) => {
   const normalizedEmail = email.trim().toLowerCase();
+  // Never allow self-registration as admin
+  const safeRole = role === "host" ? "host" : "guest";
 
   const existingUser = await pool.query(
-    "SELECT id FROM users WHERE email = $1",
+    "SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1",
     [normalizedEmail]
   );
 
@@ -26,7 +28,7 @@ export const registerUser = async ({ full_name, email, password, role = "guest" 
       VALUES ($1, $2, $3, $4)
       RETURNING id, full_name, email, role, account_status, is_email_verified, created_at
     `,
-    [full_name.trim(), normalizedEmail, passwordHash, role]
+    [full_name.trim(), normalizedEmail, passwordHash, safeRole]
   );
 
   return result.rows[0];
@@ -40,7 +42,7 @@ export const loginUser = async ({ email, password }) => {
     `
       SELECT id, full_name, email, password_hash, role, account_status, is_email_verified
       FROM users
-      WHERE email = $1
+      WHERE LOWER(email) = $1
       LIMIT 1
     `,
     [normalizedEmail]

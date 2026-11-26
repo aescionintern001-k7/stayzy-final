@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { isUnitAvailable } from "@/lib/inventory";
 import { addCalendarMonths, addCalendarYears } from "@/lib/pricing";
 
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -11,11 +13,17 @@ export async function POST(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { additionalCount = 1 } = body;
+    const additionalCount = Number(body?.additionalCount ?? 1);
+    if (!Number.isInteger(additionalCount) || additionalCount < 1 || additionalCount > 365) {
+      return NextResponse.json(
+        { error: "additionalCount must be a positive integer." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
     const booking = await prisma.booking.findUnique({
@@ -30,7 +38,19 @@ export async function POST(
     });
 
     if (!booking) {
-      return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+      return NextResponse.json({ error: "Booking not found." }, { status: 404, headers: NO_STORE_HEADERS });
+    }
+
+    const isAdmin = user.role === "ADMIN";
+    const isOwner =
+      booking.userId === user.id ||
+      (!!booking.guestEmail &&
+        booking.guestEmail.toLowerCase() === user.email.toLowerCase());
+    if (!isAdmin && !isOwner) {
+      return NextResponse.json(
+        { error: "Access denied. You do not own this booking." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
     }
 
     if (booking.status === "CANCELLED") {
@@ -131,14 +151,18 @@ export async function POST(
       return b;
     });
 
-    return NextResponse.json({
-      success: true,
-      booking: updated,
-      additionalTotal,
-      newEndTime: newEnd.toISOString(),
-      message: `Booking successfully extended! New checkout: ${newEnd.toLocaleDateString("en-IN")}.`,
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: true,
+        booking: updated,
+        additionalTotal,
+        newEndTime: newEnd.toISOString(),
+        message: `Booking successfully extended! New checkout: ${newEnd.toLocaleDateString("en-IN")}.`,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to extend booking.";
+    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

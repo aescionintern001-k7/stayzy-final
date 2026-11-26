@@ -89,7 +89,7 @@ export default function AdminLayout({
 
     async function checkAuth() {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (data.user) {
@@ -97,24 +97,21 @@ export default function AdminLayout({
             return;
           }
         }
-        const stored = typeof window !== "undefined" ? localStorage.getItem("stayzy_user") : null;
-        if (stored) {
-          setUser(JSON.parse(stored));
-        } else {
-          setUser({
-            id: "usr-admin-001",
-            email: "admin@stayzy.com",
-            role: "ADMIN",
-            name: "Stayzy Lead Admin",
-          });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("stayzy_user");
+          localStorage.removeItem("stayzy_jwt_token");
+          localStorage.removeItem("stayzy_token");
+          window.dispatchEvent(new Event("stayzy_auth_changed"));
         }
+        router.replace("/admin/login");
       } catch {
-        setUser({
-          id: "usr-admin-001",
-          email: "admin@stayzy.com",
-          role: "ADMIN",
-          name: "Stayzy Lead Admin",
-        });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("stayzy_user");
+          localStorage.removeItem("stayzy_jwt_token");
+          localStorage.removeItem("stayzy_token");
+          window.dispatchEvent(new Event("stayzy_auth_changed"));
+        }
+        router.replace("/admin/login");
       } finally {
         setLoading(false);
       }
@@ -125,34 +122,14 @@ export default function AdminLayout({
   const handleLogout = async () => {
     setProfileMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" });
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("stayzy_user");
+      localStorage.removeItem("stayzy_jwt_token");
+      localStorage.removeItem("stayzy_token");
+      window.dispatchEvent(new Event("stayzy_auth_changed"));
+    }
     router.push("/admin/login");
     router.refresh();
-  };
-
-  const handleSwitchToAdmin = async () => {
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "stayzy_user",
-          JSON.stringify({
-            id: "usr-admin-001",
-            email: "admin@stayzy.com",
-            name: "Stayzy Lead Admin",
-            phone: "+91 80 4567 8900",
-            role: "ADMIN",
-          })
-        );
-      }
-      await fetch("/api/auth/switch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "ADMIN" }),
-      });
-      window.location.reload();
-    } catch (e) {
-      console.error(e);
-      window.location.reload();
-    }
   };
 
   if (isLoginPage) {
@@ -167,6 +144,10 @@ export default function AdminLayout({
     );
   }
 
+  if (!user) {
+    return null;
+  }
+
   if (user && user.role !== "ADMIN") {
     return (
       <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-[#FAF9F4] flex flex-col">
@@ -177,18 +158,17 @@ export default function AdminLayout({
             </div>
             <h2 className="text-2xl font-extrabold text-[#14251E]">Super Admin Access Required</h2>
             <p className="text-xs text-[#5F6F67] leading-relaxed">
-              You are currently viewing with <strong>{user.role}</strong> permissions ({user.email}).
-              Switch into Super Admin mode or return to your portal below.
+              You are currently signed in with <strong>{user.role}</strong> permissions ({user.email}).
+              Sign in with an authorized Super Admin account to continue.
             </p>
             <div className="pt-2 space-y-2.5">
-              <button
-                type="button"
-                onClick={handleSwitchToAdmin}
+              <Link
+                href="/admin/login"
                 className="w-full py-3 rounded-[12px] bg-[#064B35] text-white text-xs font-bold hover:bg-[#043827] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
               >
                 <Shield className="w-4 h-4 text-[#00D6A0]" />
-                <span>Activate Super Admin Mode</span>
-              </button>
+                <span>Sign In to Super Admin</span>
+              </Link>
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Link
                   href="/owner"

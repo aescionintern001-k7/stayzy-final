@@ -1,0 +1,44 @@
+name: Auto-Merge Safe PRs to Develop
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  evaluate-auto-merge:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for security-sensitive changes requiring human review
+        id: guard
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          if echo "$CHANGED" | grep -E -q '^(backend/src/modules/auth/|backend/src/modules/payments/|backend/src/middlewares/|backend/src/database/migrations/|backend/src/config/|frontend/src/app/api/auth/|frontend/src/lib/auth\.ts|\.github/workflows/)'; then
+            echo "requires_review=true" >> "$GITHUB_OUTPUT"
+            echo "Security-sensitive files changed (auth, payments, migrations, or CI). Manual review required."
+          else
+            echo "requires_review=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enable GitHub auto-merge for non-sensitive PRs
+        if: steps.guard.outputs.requires_review == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr merge "$PR_URL" --auto --squash || echo "Auto-merge could not be enabled (enable 'Allow auto-merge' and branch protection in repo settings)."

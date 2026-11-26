@@ -1,11 +1,14 @@
-﻿import cors from "cors";
+import cors from "cors";
 import { env } from "./env.js";
 
-const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
+const allowedOrigins = env.CORS_ORIGIN.split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
 export const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin ? origin.replace(/\/$/, "") : origin;
+    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
 

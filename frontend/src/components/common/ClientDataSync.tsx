@@ -27,7 +27,6 @@ export function ClientDataSync() {
       localStorage.setItem("stayzy_tickets", JSON.stringify(INITIAL_TICKETS));
       localStorage.setItem("stayzy_properties", JSON.stringify(INITIAL_PROPERTIES));
       localStorage.setItem("stayzy_users", JSON.stringify(INITIAL_USERS));
-      localStorage.setItem("stayzy_user", JSON.stringify(DEMO_USERS.admin));
       localStorage.setItem("stayzy_initialized", "true");
     }
 
@@ -75,22 +74,21 @@ export function ClientDataSync() {
         const res = await originalFetch(input, init);
         const contentType = res.headers.get("content-type") || "";
 
-        // If response is valid JSON and not an SPA fallback HTML file, return it!
-        if (res.ok && contentType.includes("application/json")) {
+        // Never swallow real API JSON responses or /api/auth/* errors
+        if (pathname.startsWith("/api/auth/")) {
           return res;
         }
-
-        // If response is HTML (Firebase SPA rewrite ** -> index.html) or 404, fallback to client store
-        if (contentType.includes("text/html") || res.status === 404 || !res.ok) {
-          // Handled by client router below
-        } else {
+        if (contentType.includes("application/json")) {
           return res;
         }
-      } catch (networkErr) {
-        // Network error (offline or server down), fallback to client store
+        if (!contentType.includes("text/html") && res.status !== 404) {
+          return res;
+        }
+      } catch {
+        // Network error (offline or server down), fallback below
       }
 
-      // --- CLIENT STORE ROUTER (Simulates full backend on static hosting) ---
+      // --- CLIENT STORE ROUTER (Simulates catalog on static hosting, NEVER fakes auth) ---
       const createJsonResponse = (data: any, status = 200) => {
         return new Response(JSON.stringify(data), {
           status,
@@ -98,49 +96,33 @@ export function ClientDataSync() {
         });
       };
 
-      // AUTH ROUTES
+      // AUTH ROUTES (fail closed — never auto-login as Admin)
       if (pathname === "/api/auth/me") {
-        const user = getStore("stayzy_user", DEMO_USERS.admin);
-        return createJsonResponse({ success: true, user });
+        return createJsonResponse({ success: true, user: null });
       }
 
-      if (pathname === "/api/auth/login") {
-        let body: any = {};
-        if (init?.body) {
-          try {
-            body = JSON.parse(init.body as string);
-          } catch {}
-        }
-        let user = DEMO_USERS.admin;
-        if (body.demoType === "customer" || body.email?.includes("aarav") || body.requiredRole === "CUSTOMER") {
-          user = DEMO_USERS.customer;
-        } else if (body.demoType === "owner" || body.email?.includes("partner") || body.email?.includes("rajesh") || body.requiredRole === "OWNER") {
-          user = DEMO_USERS.owner;
-        }
-        setStore("stayzy_user", user);
-        return createJsonResponse({ success: true, user, message: "Logged in successfully" });
+      if (pathname === "/api/auth/login" || pathname === "/api/auth/register") {
+        return createJsonResponse(
+          {
+            success: false,
+            error: "Authentication service is unavailable. Please ensure the backend server is running.",
+          },
+          503
+        );
       }
 
       if (pathname === "/api/auth/logout") {
         localStorage.removeItem("stayzy_user");
+        localStorage.removeItem("stayzy_jwt_token");
+        localStorage.removeItem("stayzy_token");
         return createJsonResponse({ success: true, message: "Logged out" });
       }
 
       if (pathname === "/api/auth/switch") {
-        let body: any = {};
-        if (init?.body) {
-          try {
-            body = JSON.parse(init.body as string);
-          } catch {}
-        }
-        const user =
-          body.role === "CUSTOMER"
-            ? DEMO_USERS.customer
-            : body.role === "OWNER"
-            ? DEMO_USERS.owner
-            : DEMO_USERS.admin;
-        setStore("stayzy_user", user);
-        return createJsonResponse({ success: true, user });
+        return createJsonResponse(
+          { success: false, error: "Role switching is disabled. Please sign in with your account." },
+          403
+        );
       }
 
       // ADMIN USERS (3-Role Management)

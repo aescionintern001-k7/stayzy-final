@@ -30,7 +30,9 @@
     "build:backend": "npm --prefix backend run build",
     "build:apk": "npm --prefix mobile run build:apk",
     "build:apk:local": "npm --prefix mobile run build:apk:local",
-    "deploy:frontend": "firebase deploy --only hosting"
+    "deploy:frontend": "firebase deploy --only hosting",
+    "team:sync": "powershell -ExecutionPolicy Bypass -File scripts/team-sync.ps1 -PullUpdates",
+    "team:watch": "powershell -ExecutionPolicy Bypass -File scripts/team-sync.ps1 -Watch"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
