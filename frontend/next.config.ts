@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
     ],
   },
   turbopack: {
-    root: path.resolve(__dirname),
+    root: path.resolve(__dirname, ".."),
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],
