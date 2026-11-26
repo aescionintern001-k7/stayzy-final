@@ -74,10 +74,7 @@ export function ClientDataSync() {
         const res = await originalFetch(input, init);
         const contentType = res.headers.get("content-type") || "";
 
-        // Never swallow real API JSON responses or /api/auth/* errors
-        if (pathname.startsWith("/api/auth/")) {
-          return res;
-        }
+        // Never swallow real API JSON responses
         if (contentType.includes("application/json")) {
           return res;
         }
@@ -101,11 +98,15 @@ export function ClientDataSync() {
         return createJsonResponse({ success: true, user: null });
       }
 
-      if (pathname === "/api/auth/login" || pathname === "/api/auth/register") {
+      if (
+        pathname === "/api/auth/login" ||
+        pathname === "/api/auth/register" ||
+        pathname === "/api/auth/google"
+      ) {
         return createJsonResponse(
           {
             success: false,
-            error: "Authentication service is unavailable. Please ensure the backend server is running.",
+            error: "Authentication service is unavailable in static preview mode. Please run the backend server.",
           },
           503
         );
@@ -602,6 +603,14 @@ export function ClientDataSync() {
           recentBookings: bookings.slice(0, 8),
           recentVisits: visits.slice(0, 10),
           properties,
+        });
+      }
+
+      // PUBLIC PROPERTIES
+      if (pathname === "/api/properties") {
+        return createJsonResponse({
+          success: true,
+          properties: getStore("stayzy_properties", INITIAL_PROPERTIES),
         });
       }
 

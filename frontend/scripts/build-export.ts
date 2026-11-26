@@ -183,6 +183,31 @@ async function main() {
 
     const propertiesData = JSON.stringify({ success: true, properties: INITIAL_PROPERTIES });
     fs.writeFileSync(path.join(outAdminApiDir, "properties.json"), propertiesData, "utf8");
+    fs.writeFileSync(path.join(outApiDir, "properties.json"), propertiesData, "utf8");
+
+    const { A_TO_Z_CITIES } = await import("../src/lib/cities-data");
+    const allCities: any[] = [];
+    const letterCounts: Record<string, number> = {};
+    const countryCounts: Record<string, number> = {};
+    for (const [char, list] of Object.entries(A_TO_Z_CITIES)) {
+      letterCounts[char] = (list as any[]).length;
+      for (const city of list as any[]) {
+        allCities.push({
+          ...city,
+          id: `${char}-${city.name.toLowerCase().replace(/\s+/g, "-")}`,
+          slug: city.name.toLowerCase().replace(/\s+/g, "-"),
+          firstLetter: char,
+          propertyCount: city.hasStays ? 8 : city.isPopular ? 3 : 0,
+        });
+        countryCounts[city.country] = (countryCounts[city.country] || 0) + 1;
+      }
+    }
+    const countries = Object.entries(countryCounts).map(([name, count]) => ({ name, count }));
+    fs.writeFileSync(
+      path.join(outApiDir, "cities.json"),
+      JSON.stringify({ success: true, cities: allCities, letterCounts, countries }),
+      "utf8"
+    );
 
     const visitsData = JSON.stringify({ success: true, visits: INITIAL_VISITS });
     fs.writeFileSync(path.join(outAdminApiDir, "visits.json"), visitsData, "utf8");
@@ -297,6 +322,8 @@ async function main() {
         rewrites: [
           { source: "/api/rooms", destination: "/api/rooms.json" },
           { source: "/api/content", destination: "/api/content.json" },
+          { source: "/api/properties", destination: "/api/properties.json" },
+          { source: "/api/cities", destination: "/api/cities.json" },
           { source: "/api/admin/payments", destination: "/api/admin/payments.json" },
           { source: "/api/admin/bookings", destination: "/api/admin/bookings.json" },
           { source: "/api/admin/properties", destination: "/api/admin/properties.json" },

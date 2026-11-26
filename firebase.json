@@ -33,6 +33,14 @@
         "destination": "/api/content.json"
       },
       {
+        "source": "/api/properties",
+        "destination": "/api/properties.json"
+      },
+      {
+        "source": "/api/cities",
+        "destination": "/api/cities.json"
+      },
+      {
         "source": "/api/admin/payments",
         "destination": "/api/admin/payments.json"
       },
