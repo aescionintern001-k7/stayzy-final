@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { Clock } from "lucide-react";
 import { ArrowFillButton } from "@/components/ui/arrow-fill-button";
 
 interface CityItem {
@@ -68,10 +68,11 @@ const CITIES: CityItem[] = [
 
 export function CitySelectorStrip() {
   const router = useRouter();
-  const [activeCity, setActiveCity] = useState<string | null>(null);
+  const [activeCity, setActiveCity] = useState<string>("Bengaluru");
   const [hoveredCity, setHoveredCity] = useState<string | null>(null);
 
   const handleSelectCity = (city: CityItem) => {
+    if (city.id !== "bengaluru") return;
     setActiveCity(city.name);
     router.push(`/rooms?city=${encodeURIComponent(city.name)}`);
   };
@@ -143,75 +144,93 @@ export function CitySelectorStrip() {
         {/* ======================================================== */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 lg:gap-4 items-stretch">
           {CITIES.map((city) => {
-            const isSelected = activeCity === city.name;
-            const isHovered = hoveredCity === city.name;
+            const isComingSoon = city.id !== "bengaluru";
+            const isSelected = !isComingSoon && activeCity === city.name;
+            const isHovered = !isComingSoon && hoveredCity === city.name;
 
             return (
               <button
                 key={city.id}
                 type="button"
+                disabled={isComingSoon}
+                aria-disabled={isComingSoon}
                 onClick={() => handleSelectCity(city)}
-                onMouseEnter={() => setHoveredCity(city.name)}
-                onMouseLeave={() => setHoveredCity(null)}
+                onMouseEnter={() => {
+                  if (!isComingSoon) setHoveredCity(city.name);
+                }}
+                onMouseLeave={() => {
+                  if (!isComingSoon) setHoveredCity(null);
+                }}
                 onBlur={() => setHoveredCity((prev) => (prev === city.name ? null : prev))}
-                className={`group relative rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex flex-col items-center justify-between text-center cursor-pointer transition-all duration-300 overflow-hidden border-[1.5px] bg-white ${
-                  isHovered
-                    ? "border-[#079B50]/80 shadow-[0_12px_28px_rgba(7,155,80,0.14)] -translate-y-1.5"
+                className={`group relative rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex flex-col items-center justify-between text-center transition-all duration-300 overflow-hidden border-[1.5px] bg-white ${
+                  isComingSoon
+                    ? "border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)] cursor-not-allowed"
+                    : isHovered
+                    ? "border-[#008F55] shadow-[0_12px_28px_rgba(0,143,85,0.16)] -translate-y-1.5 ring-1 ring-[#008F55]/25 cursor-pointer"
                     : isSelected
-                    ? "border-[#079B50] shadow-[0_4px_16px_rgba(7,155,80,0.10)] ring-1 ring-[#079B50]/20"
-                    : "border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)]"
+                    ? "border-[#008F55] shadow-[0_10px_26px_rgba(0,143,85,0.13)] ring-1 ring-[#008F55]/25 cursor-pointer"
+                    : "border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)] cursor-pointer"
                 }`}
               >
-                {/* Subtle Top Backdrop Gradient inside card (only intensifies on hover) */}
-                <div
-                  className={`absolute inset-x-0 top-0 h-32 pointer-events-none transition-opacity duration-300 ${
-                    isHovered
-                      ? "bg-gradient-to-b from-[#EAF8F0] via-white/80 to-transparent opacity-100"
-                      : "bg-gradient-to-b from-[#F2F9F5] via-white/60 to-transparent opacity-65"
-                  }`}
-                />
-
-                {/* Selected indicator dot (distinct from hover animation) */}
-                {isSelected && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-3 right-3 z-20 w-2 h-2 rounded-full bg-[#079B50]"
-                  />
+                {/* Sharp Top-Center COMING SOON Badge for Unavailable Cities */}
+                {isComingSoon && (
+                  <span className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#EAF5E5] border border-[#C6E2BC] text-[#064B35] text-[10px] font-extrabold tracking-wider uppercase whitespace-nowrap shadow-2xs pointer-events-none">
+                    <Clock className="w-2.5 h-2.5 text-[#008F55] shrink-0" aria-hidden="true" />
+                    <span>COMING SOON</span>
+                  </span>
                 )}
 
-                {/* Standardized 3D Landmark Illustration Showcase */}
-                <div className="relative z-10 w-full h-24 sm:h-28 flex items-center justify-center p-1 mb-2">
-                  <img
-                    src={city.image}
-                    alt={`${city.name} Landmark - ${city.landmark}`}
-                    className={`max-h-full max-w-full object-contain object-center transform transition-transform duration-300 ease-out drop-shadow-xs ${
-                      isHovered ? "scale-105" : "scale-100"
-                    }`}
-                    loading="lazy"
-                  />
-                </div>
-
-                {/* City Title and Hubs Container */}
-                <div className="relative z-10 w-full flex flex-col items-center pt-0.5 pb-1">
-                  <h3
-                    className={`text-sm sm:text-base font-extrabold tracking-tight transition-colors duration-200 leading-snug ${
-                      isHovered || isSelected ? "text-[#079B50]" : "text-[#17212B]"
-                    }`}
-                  >
-                    {city.name}
-                  </h3>
-
-                  <span className="text-xs sm:text-[13px] font-bold text-[#079B50] mt-0.5 tracking-tight">
-                    {city.localityCount}+ Hubs
-                  </span>
-                </div>
-
-                {/* Bottom Emerald Accent Bar (visible ONLY on hover) */}
+                {/* Card Content Wrapper (Blurred & Softened for Coming Soon Cities) */}
                 <div
-                  className={`absolute inset-x-4 bottom-0 h-1 rounded-full bg-[#079B50] transition-all duration-300 ${
-                    isHovered ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50"
+                  className={`w-full flex flex-col items-center justify-between flex-1 ${
+                    isComingSoon ? "blur-[2.5px] opacity-65 pointer-events-none select-none" : ""
                   }`}
-                />
+                >
+                  {/* Subtle Top Backdrop Gradient inside card */}
+                  <div
+                    className={`absolute inset-x-0 top-0 h-32 pointer-events-none transition-opacity duration-300 ${
+                      isSelected || isHovered
+                        ? "bg-gradient-to-b from-[#EAF8F0] via-white/80 to-transparent opacity-100"
+                        : "bg-gradient-to-b from-[#F2F9F5] via-white/60 to-transparent opacity-65"
+                    }`}
+                  />
+
+                  {/* Standardized 3D Landmark Illustration Showcase */}
+                  <div className="relative z-10 w-full h-24 sm:h-28 flex items-center justify-center p-1 mb-2">
+                    <img
+                      src={city.image}
+                      alt={`${city.name} Landmark - ${city.landmark}`}
+                      className={`max-h-full max-w-full object-contain object-center transform transition-transform duration-300 ease-out drop-shadow-xs ${
+                        isHovered ? "scale-105" : "scale-100"
+                      }`}
+                      loading="lazy"
+                    />
+                  </div>
+
+                  {/* City Title and Hubs Container */}
+                  <div className="relative z-10 w-full flex flex-col items-center pt-0.5 pb-1">
+                    <h3
+                      className={`text-sm sm:text-base font-extrabold tracking-tight transition-colors duration-200 leading-snug ${
+                        isSelected || isHovered ? "text-[#008F55]" : "text-[#17212B]"
+                      }`}
+                    >
+                      {city.name}
+                    </h3>
+
+                    <span className="text-xs sm:text-[13px] font-bold text-[#008F55] mt-0.5 tracking-tight">
+                      {city.localityCount}+ Hubs
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom Emerald Accent Bar (Active for Bengaluru & on Hover) */}
+                {!isComingSoon && (
+                  <div
+                    className={`absolute inset-x-4 bottom-0 h-1 rounded-full bg-[#008F55] transition-all duration-300 ${
+                      isSelected || isHovered ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50"
+                    }`}
+                  />
+                )}
               </button>
             );
           })}
