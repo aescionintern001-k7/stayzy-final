@@ -55,3 +55,6 @@ next-env.d.ts
 *.apk
 *.aab
 .eas/
+
+# nested duplicate clone
+stayzy/
