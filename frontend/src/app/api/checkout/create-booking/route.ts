@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { findAvailableUnits } from "@/lib/inventory";
 import { calculateBookingPricing } from "@/lib/pricing";
 import { PaymentAdapter } from "@/lib/payments/adapter";
 import { getCurrentUser } from "@/lib/auth";
@@ -47,13 +48,15 @@ export async function POST(request: Request) {
         where: { token: holdToken },
       });
 
-      if (!hold || hold.expiresAt < new Date()) {
+      if (hold && hold.expiresAt < new Date()) {
         return NextResponse.json(
           { error: "Your 15-minute checkout reservation hold has expired. Please reselect your dates." },
           { status: 410 }
         );
       }
-      unitId = hold.inventoryUnitId || unitId;
+      if (hold) {
+        unitId = hold.inventoryUnitId || unitId;
+      }
     }
 
     // 2. Fetch roomType and property
@@ -168,6 +171,14 @@ export async function POST(request: Request) {
     }
 
     const currentUser = await getCurrentUser();
+    let prismaUserId: string | null = null;
+    if (currentUser?.id) {
+      const existingUser = await prisma.user.findUnique({
+        where: { id: currentUser.id },
+        select: { id: true },
+      });
+      prismaUserId = existingUser?.id || null;
+    }
 
     // 4. Generate unique human-readable booking reference
     const refCode = crypto.randomBytes(3).toString("hex").toUpperCase();
@@ -176,12 +187,19 @@ export async function POST(request: Request) {
     const startDateTime = new Date(breakdown.startDateTime);
     const endDateTime = new Date(breakdown.endDateTime);
 
+    if (!unitId) {
+      const availableUnits = await findAvailableUnits(roomType.id, startDateTime, endDateTime);
+      if (availableUnits.length > 0) {
+        unitId = availableUnits[0].unitId;
+      }
+    }
+
     // 5. Create Booking in atomic transaction
     const booking = await prisma.$transaction(async (tx) => {
       const newBooking = await tx.booking.create({
         data: {
           bookingReference,
-          userId: currentUser?.id || null,
+          userId: prismaUserId,
           propertyId: roomType.propertyId,
           roomTypeId: roomType.id,
           inventoryUnitId: unitId,
