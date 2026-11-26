@@ -122,7 +122,7 @@ export function Hero() {
   ];
 
   return (
-    <div className="relative w-full min-h-[820px] lg:min-h-[920px] flex flex-col justify-between overflow-hidden bg-[#0c130e] text-white pt-32 sm:pt-36 lg:pt-40">
+    <div className="relative w-full min-h-[780px] lg:min-h-[900px] flex flex-col justify-between overflow-hidden bg-[#0c130e] text-white pt-24 sm:pt-32 lg:pt-36">
       {/* ======================================================== */}
       {/* 1. CINEMATIC VIDEO BACKGROUND & PRECISE GRADIENT OVERLAYS */}
       {/* ======================================================== */}

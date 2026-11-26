@@ -3,8 +3,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { Shield, Lock, Mail, ArrowRight, AlertCircle } from "lucide-react";
 
@@ -65,10 +63,8 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
-      <main className="flex-1 flex items-center justify-center py-16 px-4">
+    <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] flex flex-col bg-white">
+      <main className="flex-1 flex items-center justify-center py-12 px-4">
         <div className="bg-white rounded-lg border border-[#E8E6DF] p-8 max-w-md w-full shadow-card-hover space-y-6">
           <div className="text-center space-y-2">
             <img

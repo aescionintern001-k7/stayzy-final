@@ -36,9 +36,14 @@
 }
 
 html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 5.5rem;
+  scroll-padding-top: 5rem;
   overflow-x: clip;
+}
+
+@media (min-width: 1024px) {
+  html {
+    scroll-padding-top: 7.75rem;
+  }
 }
 
 body {
@@ -126,4 +131,314 @@ textarea {
   font-weight: 700;
   border: 1px solid #D5D2C7;
   border-radius: 6px !important;
+}
+
+/* All-Inclusive Living responsive grid: 1 col mobile, 2 cols tablet (768px-1199px), 4 cols desktop (1200px+) */
+.stayzy-amenities-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .stayzy-amenities-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .stayzy-amenities-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+/* How Booking Works responsive layout: vertical with connectors on mobile, 2+1 on tablet, 3-card row + arrows on 1200px+ */
+.stayzy-how-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.stayzy-how-arrow-desktop {
+  display: none;
+}
+
+.stayzy-how-arrow-mobile {
+  display: flex;
+  justify-content: center;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .stayzy-how-flow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+  .stayzy-how-card-third {
+    grid-column: span 2 / span 2;
+    max-width: 540px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .stayzy-how-arrow-mobile {
+    display: none;
+  }
+}
+
+@media (min-width: 1200px) {
+  .stayzy-how-flow {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .stayzy-how-arrow-desktop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .stayzy-how-arrow-mobile {
+    display: none;
+  }
+}
+
+/* Stayzy FAQ Horizontal Scroller Keyframes & Reduced-Motion Fallbacks */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-horizontal {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes scroll-horizontal-reverse {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.scroller-mask {
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000000 5%,
+    #000000 95%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000000 5%,
+    #000000 95%,
+    transparent 100%
+  );
+}
+
+.animate-scroll-horizontal {
+  width: max-content;
+  animation: scroll-horizontal var(--scroll-duration, 50s) linear infinite;
+  will-change: transform;
+}
+
+.animate-scroll-horizontal-reverse {
+  width: max-content;
+  animation: scroll-horizontal-reverse var(--scroll-duration, 50s) linear infinite;
+  will-change: transform;
+}
+
+.faq-scroller-row:hover .animate-scroll-horizontal,
+.faq-scroller-row:hover .animate-scroll-horizontal-reverse,
+.faq-scroller-row:focus-within .animate-scroll-horizontal,
+.faq-scroller-row:focus-within .animate-scroll-horizontal-reverse {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroller-mask {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .animate-scroll-horizontal,
+  .animate-scroll-horizontal-reverse {
+    animation: none !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-content: center;
+  }
+
+  .faq-scroller-track-primary {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex-shrink: 1 !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-right: 0 !important;
+  }
+
+  .faq-scroller-track-primary > .faq-card {
+    flex: 1 1 280px;
+    width: 100% !important;
+    max-width: 432px;
+  }
+
+  .faq-scroller-track-duplicate,
+  .faq-scroller-filler {
+    display: none !important;
+  }
+}
+
+/* Stayzy Press, City Directory & 5-Column Footer Responsive Grids */
+.stayzy-press-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.stayzy-press-logos {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: 1.125rem;
+  column-gap: 1rem;
+  align-items: center;
+}
+
+.stayzy-press-div {
+  display: none;
+}
+
+@media (min-width: 640px) and (max-width: 1199px) {
+  .stayzy-press-logos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .stayzy-press-row {
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+  .stayzy-press-logos {
+    width: auto;
+    flex: 1 1 0%;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  .stayzy-press-div {
+    display: block;
+    width: 1px;
+    height: 2rem;
+    background-color: #dfd3bf;
+    flex-shrink: 0;
+    margin-left: 0.45rem;
+    margin-right: 0.45rem;
+  }
+}
+
+@media (min-width: 1360px) {
+  .stayzy-press-row {
+    gap: 1.25rem;
+  }
+  .stayzy-press-div {
+    height: 2.25rem;
+    margin-left: 1.15rem;
+    margin-right: 1.15rem;
+  }
+}
+
+.stayzy-city-links-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.25rem;
+  row-gap: 0.75rem;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .stayzy-city-links-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 1.5rem;
+    row-gap: 0.875rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .stayzy-city-links-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    column-gap: 0.85rem;
+    row-gap: 0.85rem;
+  }
+}
+
+@media (min-width: 1380px) {
+  .stayzy-city-links-grid {
+    column-gap: 1.5rem;
+    row-gap: 0.9rem;
+  }
+}
+
+.stayzy-footer-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2.25rem;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .stayzy-footer-cols {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+  }
+  .stayzy-footer-brand-col {
+    grid-column: span 2 / span 2;
+  }
+}
+
+@media (min-width: 1200px) {
+  .stayzy-footer-cols {
+    grid-template-columns: 1.42fr 1.12fr 1.12fr 0.96fr 1.08fr;
+    gap: 0;
+  }
+  .stayzy-footer-col-sep {
+    border-right: 1px solid rgba(0, 214, 160, 0.14);
+    padding-right: 1.25rem;
+  }
+  .stayzy-footer-col-pad {
+    padding-left: 1.25rem;
+  }
+}
+
+@media (min-width: 1360px) {
+  .stayzy-footer-col-sep {
+    padding-right: 1.75rem;
+  }
+  .stayzy-footer-col-pad {
+    padding-left: 1.75rem;
+  }
 }

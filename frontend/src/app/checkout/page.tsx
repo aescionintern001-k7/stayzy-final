@@ -3,8 +3,6 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import {
   ShieldCheck,
@@ -382,7 +380,7 @@ function CheckoutContent() {
 
         {/* Right Summary Card (5 Cols) */}
         <div className="lg:col-span-5">
-          <div className="bg-white rounded-lg border border-[#E8E6DF] p-6 sm:p-8 shadow-card-hover space-y-6 sticky top-24 max-h-[calc(100vh-6.5rem)] overflow-y-auto">
+          <div className="bg-white rounded-lg border border-[#E8E6DF] p-6 sm:p-8 shadow-card-hover space-y-6 sticky top-[128px] max-h-[calc(100vh-8.75rem)] overflow-y-auto">
             <h3 className="text-base font-bold text-[#123D2B] pb-3 border-b border-[#F0EDE4]">
               Stay Summary
             </h3>
@@ -559,9 +557,7 @@ function CheckoutContent() {
 
 export default function CheckoutPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
+    <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] flex flex-col bg-white">
       <main className="flex-1">
         <Suspense
           fallback={

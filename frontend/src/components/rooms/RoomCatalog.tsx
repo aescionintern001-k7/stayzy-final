@@ -360,7 +360,7 @@ export function RoomCatalog() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 pt-6">
         {/* Desktop Sidebar Filters: Zolo Clean Design */}
         <aside className="hidden lg:block lg:col-span-1 relative">
-          <div className="sticky top-24 max-h-[calc(100vh-6.5rem)] overflow-y-auto pr-1 overscroll-contain">
+          <div className="sticky top-[128px] max-h-[calc(100vh-8.75rem)] overflow-y-auto pr-1 overscroll-contain">
             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <span className="text-sm font-black text-gray-900 flex items-center gap-2">

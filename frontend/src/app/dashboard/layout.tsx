@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { DemoBanner } from "@/components/common/DemoBanner";
+import { StayzyLogo } from "@/components/common/StayzyLogo";
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -104,19 +104,17 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center text-xs text-[#5E6E65]">
+      <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-white flex items-center justify-center text-xs text-[#5E6E65]">
         Loading your resident dashboard...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-
-      {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] flex flex-col bg-white">
+      {/* Contextual Portal Toolbar (Sits cleanly below global Navbar) */}
+      <div className="bg-[#FAF8F5] border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
@@ -126,12 +124,8 @@ export default function DashboardLayout({
               {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            <Link href="/" className="flex items-center gap-2.5">
-              <img
-                src="/stayzy-logo.png"
-                alt="Stayzy Logo"
-                className="h-8 w-auto object-contain rounded-md"
-              />
+            <Link href="/" className="flex items-center gap-2.5" aria-label="Stayzy Home">
+              <StayzyLogo variant="dark" size="sm" />
             </Link>
 
             <span className="text-xs font-bold text-[#5E6E65] pl-2 border-l border-[#D5D2C7] hidden md:inline">
@@ -181,13 +175,13 @@ export default function DashboardLayout({
             )}
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main Container with Sidebar */}
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex gap-8">
         {/* Desktop Forest-Green Sidebar */}
         <aside className="hidden lg:block w-64 shrink-0">
-          <nav className="bg-[#123D2B] text-white rounded-lg p-4 shadow-card-hover space-y-1.5 sticky top-24 max-h-[calc(100vh-6.5rem)] overflow-y-auto">
+          <nav className="bg-[#123D2B] text-white rounded-lg p-4 shadow-card-hover space-y-1.5 sticky top-[128px] max-h-[calc(100vh-8.75rem)] overflow-y-auto">
             <div className="px-3 py-2 text-[11px] font-extrabold uppercase tracking-widest text-[#E8F1D5]/70">
               Resident Navigation
             </div>
@@ -228,7 +222,7 @@ export default function DashboardLayout({
 
         {/* Mobile Navigation Drawer */}
         {mobileNavOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex">
+          <div className="lg:hidden fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex">
             <div className="w-72 bg-[#123D2B] text-white h-full p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-left">
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-white/15">

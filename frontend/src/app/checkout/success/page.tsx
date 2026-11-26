@@ -3,8 +3,6 @@
 import React, { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import {
   CheckCircle2,
@@ -67,8 +65,6 @@ function CheckoutSuccessContent() {
 export default function BookingSuccessPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
       <Suspense fallback={<div className="p-12 text-center text-xs text-[#5E6E65]">Loading confirmation...</div>}>
         <CheckoutSuccessContent />
       </Suspense>

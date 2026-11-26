@@ -2,8 +2,6 @@ import React from "react";
 import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { PrintReceiptButton } from "@/components/common/PrintReceiptButton";
 import {
@@ -61,9 +59,6 @@ export default async function BookingConfirmationPage({
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
-
       <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-12 w-full space-y-8">
         <div className="bg-white rounded-lg border border-[#E8E6DF] p-8 sm:p-12 shadow-card-hover space-y-8">
           {/* Header Banner */}

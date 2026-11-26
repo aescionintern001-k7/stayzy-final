@@ -10,4 +10,6 @@ export * from "./animated-underline-text-one";
 export * from "./arrow-fill-button";
 export * from "./StarBorder";
 export * from "./liquid-glass-navbar";
+export * from "./typewriter-text";
+export * from "./habit-faq-scroller";
 

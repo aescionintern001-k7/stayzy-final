@@ -1,6 +1,4 @@
 import React from "react";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { AmenitiesStrip } from "@/components/home/AmenitiesStrip";
 import { ShieldCheck, Wifi, Utensils, Laptop, KeyRound, Zap, Shirt, ShowerHead } from "lucide-react";
@@ -9,9 +7,6 @@ import Link from "next/link";
 export default function AmenitiesPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
-
       <main className="flex-1 space-y-12 pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
           <div className="text-center max-w-3xl mx-auto space-y-3">

@@ -1,15 +1,10 @@
 import React from "react";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { AlertTriangle } from "lucide-react";
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
-
       <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
         <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 shrink-0" />

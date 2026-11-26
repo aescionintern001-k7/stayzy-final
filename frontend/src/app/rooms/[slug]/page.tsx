@@ -1,8 +1,6 @@
 
 import React from "react";
 import { notFound } from "next/navigation";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { RoomDetailsClient } from "./RoomDetailsClient";
 import { backendPropertyToFrontendRoom } from "@/lib/api/adapters";
@@ -59,9 +57,6 @@ export default async function RoomDetailsPage({
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
-
       <main className="flex-1 bg-white">
         <RoomDetailsClient
           room={{

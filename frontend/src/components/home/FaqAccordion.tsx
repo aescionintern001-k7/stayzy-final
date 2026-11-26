@@ -1,109 +1,117 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { ChevronDown, HelpCircle } from "lucide-react";
+import React from "react";
+import {
+  CalendarCheck,
+  Utensils,
+  Wifi,
+  House,
+  BedDouble,
+  Zap,
+  CreditCard,
+  Headset,
+} from "lucide-react";
+import { FaqSection, type FaqSectionData } from "@/components/ui/habit-faq-scroller";
 
-const DEFAULT_FAQS = [
-  {
-    q: "Can I book for a few hours?",
-    a: "Yes! Stayzy offers dedicated Hourly stay packages from 2 to 10 hours between 8:00 AM and 10:00 PM. It is ideal for focused work sprints, remote interviews, or resting during flight layovers. You get a private desk, 300 Mbps Wi-Fi, air conditioning, and washroom access with zero deposit required.",
-  },
-  {
-    q: "Is food included?",
-    a: "For daily and weekly bookings, daily meals are included in the tariff. For monthly and yearly stays, our nutritious 3-meal plan (Breakfast, Lunch, and Dinner) can be selected during booking or added to your monthly invoice at actual cost. Special dietary preferences (vegetarian / non-vegetarian) can be noted.",
-  },
-  {
-    q: "Is a deposit required?",
-    a: "Hourly, daily, and weekly bookings require zero security deposit. For monthly and yearly stays, a 100% refundable security deposit is collected and securely held. It is refunded directly to your bank account within 3 to 5 business days after move-out inspection, subject only to actual unpaid electricity dues or room damages.",
-  },
-  {
-    q: "Can I extend my stay?",
-    a: "Yes, easily! You can extend your booking directly from your resident dashboard at any time. As long as your specific room or bed is available for the additional days, the system extends your booking instantly at your locked-in rate without any surcharge or penalty.",
-  },
-  {
-    q: "How does cancellation work?",
-    a: "Cancellations made 48 hours or more before your scheduled check-in receive a 100% full refund with zero cancellation fees. For cancellations within 48 hours of check-in, only the first night/day charge is retained. Hourly bookings can be cancelled free of charge up to 6 hours before start time.",
-  },
-  {
-    q: "Can I visit before booking?",
-    a: "Yes, we encourage it! You can schedule an in-person walkthrough anytime using the 'Schedule a Visit' form on this page. Pick your preferred property, date, and time slot, and our community manager will show you the rooms, dining spaces, and facilities.",
-  },
-];
+/**
+ * Editable Stayzy Frequently Asked Questions dataset arranged across three
+ * alternating horizontal scroller rows. Update questions, answers, icons,
+ * or scroll durations directly here.
+ */
+export const STAYZY_FAQ_DATA: FaqSectionData = {
+  badge: "STAYZY SUPPORT",
+  mainTitle: "Frequently Asked Questions",
+  highlightedWord: "Questions",
+  mainSubtitle:
+    "Everything you need to know about finding your perfect Stayzy home. We're here to make your stay simple, comfortable, and stress-free.",
+  rows: [
+    {
+      id: "row-1",
+      speed: "50s",
+      direction: "left",
+      repeatSets: 1,
+      faqItems: [
+        {
+          id: "faq-booking",
+          question: "How do I book a room at Stayzy?",
+          answer:
+            "Browse available properties, select your preferred room or bed, choose your stay dates, and complete the booking process through our website.",
+          icon: CalendarCheck,
+        },
+        {
+          id: "faq-meals",
+          question: "Are meals included in the accommodation?",
+          answer:
+            "Yes. Stayzy provides nutritious daily meals, including breakfast, lunch, and dinner, according to the selected accommodation package.",
+          icon: Utensils,
+        },
+        {
+          id: "faq-wifi",
+          question: "Is high-speed Wi-Fi available?",
+          answer:
+            "Yes. Stayzy provides high-speed 300 Mbps Wi-Fi to support working, studying, streaming, and everyday online activities.",
+          icon: Wifi,
+        },
+      ],
+    },
+    {
+      id: "row-2",
+      speed: "56s",
+      direction: "right",
+      repeatSets: 1,
+      faqItems: [
+        {
+          id: "faq-visit",
+          question: "Can I visit the property before booking?",
+          answer:
+            "Absolutely! You can schedule a complimentary property walkthrough to explore the rooms, facilities, and shared spaces before making your decision.",
+          icon: House,
+        },
+        {
+          id: "faq-furnished",
+          question: "Are the rooms fully furnished?",
+          answer:
+            "Yes. Our rooms are thoughtfully furnished with comfortable beds, storage, essential furniture, and other amenities for convenient everyday living.",
+          icon: BedDouble,
+        },
+        {
+          id: "faq-power-backup",
+          question: "Is electricity backup available?",
+          answer:
+            "Yes. Stayzy provides power backup to help residents enjoy uninterrupted daily living.",
+          icon: Zap,
+        },
+      ],
+    },
+    {
+      id: "row-3",
+      speed: "60s",
+      direction: "left",
+      repeatSets: 2,
+      faqItems: [
+        {
+          id: "faq-payments",
+          question: "What payment and rental options are available?",
+          answer:
+            "Stayzy offers flexible stay durations and transparent pricing. Available payment and rental options depend on the selected property.",
+          icon: CreditCard,
+        },
+        {
+          id: "faq-cancellation",
+          question: "How can I cancel or modify my booking?",
+          answer:
+            "Please contact the Stayzy support team to discuss available cancellation or modification options based on your booking terms.",
+          icon: Headset,
+        },
+      ],
+    },
+  ],
+};
 
+/**
+ * Homepage & `/faq` route FAQ section wrapper rendering Stayzy's
+ * luxury three-row horizontal FAQ scroller.
+ */
 export function FaqAccordion() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-  const [faqs, setFaqs] = useState(DEFAULT_FAQS);
-
-  useEffect(() => {
-    async function loadCMS() {
-      try {
-        const res = await fetch("/api/content");
-        const data = await res.json();
-        if (data.success && data.content?.faq_content?.items?.length > 0) {
-          const cmsFaqs = data.content.faq_content.items.map((item: any) => ({
-            q: item.question,
-            a: item.answer,
-          }));
-          setFaqs(cmsFaqs);
-        }
-      } catch (e) {
-        // Fallback to static
-      }
-    }
-    loadCMS();
-  }, []);
-
-  const toggle = (idx: number) => {
-    setOpenIndex(openIndex === idx ? null : idx);
-  };
-
-  return (
-    <section id="faq" className="py-24 bg-white border-t border-gray-100">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <div className="inline-block px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold uppercase tracking-wider border border-emerald-200/80 shadow-2xs">
-            Frequently Asked Questions
-          </div>
-          <h2 className="text-4xl sm:text-5xl font-black text-[#0F172A] mt-3 tracking-tight">
-            Clear answers to common questions
-          </h2>
-          <p className="text-base text-gray-600 font-medium mt-2">
-            Everything you need to know about flexible PG living, schedules, deposits, and visits.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          {faqs.map((faq, idx) => {
-            const isOpen = openIndex === idx;
-            return (
-              <div
-                key={idx}
-                className="border border-gray-200 rounded-xl overflow-hidden transition-colors bg-white shadow-xs"
-              >
-                <button
-                  onClick={() => toggle(idx)}
-                  className="w-full py-5 px-6 text-left flex items-center justify-between gap-4 font-bold text-base text-[#0F172A] hover:text-emerald-700 transition-colors cursor-pointer"
-                  aria-expanded={isOpen}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>{faq.q}</span>
-                  </span>
-                  <ChevronDown
-                    className={`w-5 h-5 text-emerald-600 shrink-0 transition-transform duration-200 ${
-                      isOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-                {isOpen && (
-                  <div className="px-6 pb-6 pt-1 text-sm text-gray-600 leading-relaxed border-t border-gray-100 bg-white">
-                    {faq.a}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
+  return <FaqSection data={STAYZY_FAQ_DATA} sectionId="faq" />;
 }

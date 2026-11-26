@@ -7,6 +7,7 @@ import { ArrowRight, Check, Home, Images, X, ChevronLeft, ChevronRight } from "l
 import AccordionGallery, { GalleryItem } from "@/components/ui/AccordionGallery";
 import { AnimatedText } from "@/components/ui/animated-underline-text-one";
 import { ArrowFillButton } from "@/components/ui/arrow-fill-button";
+import { Typewriter } from "@/components/ui/typewriter-text";
 
 interface RoomCategory {
   id: string;
@@ -181,9 +182,22 @@ export function ColivingCategoriesSection() {
             underlineStrokeWidth={3}
           />
 
-          {/* Subtitle: 17-18px, line-height 1.6 */}
-          <p className="mt-4 sm:mt-5 text-base sm:text-[17px] lg:text-[18px] text-[#64748B] font-normal leading-[1.6]">
-            Clean, fully-furnished PG rooms with high-speed Wi-Fi, home-cooked food, and daily housekeeping.
+          {/* Subtitle with Typewriter animation, matched typography & zero layout shift */}
+          <p className="mt-5 sm:mt-6 max-w-[740px] mx-auto min-h-[78px] sm:min-h-[62px] flex items-center justify-center text-base sm:text-[18px] lg:text-[19px] text-[#475569] font-medium leading-[1.6]">
+            <Typewriter
+              text={[
+                "Clean, fully-furnished PG rooms with high-speed Wi-Fi, home-cooked food, and daily housekeeping.",
+                "Private rooms, twin sharing, and pocket-friendly stays crafted for students and professionals.",
+                "Zero brokerage, verified co-living residences, and seamless digital move-in across top tech hubs.",
+              ]}
+              speed={35}
+              deleteSpeed={20}
+              delay={2500}
+              loop={true}
+              cursor="|"
+              cursorClassName="text-[#009B62] font-semibold"
+              startWhenVisible={true}
+            />
           </p>
         </div>
 

@@ -192,10 +192,10 @@ export function CitiesDirectory() {
         </div>
       </section>
 
-      {/* 2. ALPHABETICAL DIRECTORY BAR (EXACT OYO-STYLE NAVIGATION) */}
+      {/* 2. ALPHABETICAL DIRECTORY BAR (Sticky cleanly below global Navbar) */}
       <nav
         aria-label="Alphabetical city navigation"
-        className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-xs"
+        className="sticky top-[65px] lg:top-[109px] z-30 bg-white border-b border-gray-200 shadow-xs"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between overflow-x-auto scrollbar-none py-2 gap-1 sm:gap-2">

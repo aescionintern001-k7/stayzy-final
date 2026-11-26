@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 };
 
 import { ClientDataSync } from "@/components/common/ClientDataSync";
+import { Navbar } from "@/components/common/Navbar";
 import { FloatingContactButtons } from "@/components/common/FloatingContactButtons";
 import { ToastProvider } from "@/components/ui/Toast";
 
@@ -38,7 +39,8 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans bg-white text-[#111827] selection:bg-emerald-100 selection:text-emerald-950">
         <ToastProvider>
           <ClientDataSync />
-          {children}
+          <Navbar />
+          <div className="flex-1 flex flex-col min-w-0">{children}</div>
           <FloatingContactButtons />
         </ToastProvider>
       </body>

@@ -45,6 +45,36 @@ export function Navbar() {
   const [cityQuickSearch, setCityQuickSearch] = useState<string>("" );
 
   const navContainerRef = useRef<HTMLDivElement>(null);
+  const prevPathnameRef = useRef(pathname);
+  const isPopStateRef = useRef(false);
+
+  // Track browser Back/Forward transitions cleanly so forward navigations always start at top
+  useEffect(() => {
+    const handlePopState = () => {
+      isPopStateRef.current = true;
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Close menus and reset scroll position cleanly on forward route changes
+  useEffect(() => {
+    setActiveDropdown(null);
+    setMobileMenuOpen(false);
+
+    if (prevPathnameRef.current !== pathname) {
+      const wasPop = isPopStateRef.current;
+      isPopStateRef.current = false;
+      prevPathnameRef.current = pathname;
+
+      if (!wasPop && !window.location.hash) {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        });
+      }
+    }
+  }, [pathname]);
 
   // Detect current role from URL or localStorage
   useEffect(() => {
@@ -171,21 +201,35 @@ export function Navbar() {
   }, [activeCityLetter, cityQuickSearch]);
 
   const isHomeActive = pathname === "/";
+  const isRoomsActive = pathname.startsWith("/rooms") || pathname === "/explore";
+  const isServicesActive = pathname === "/amenities";
+  const isCitiesActive = pathname === "/cities";
+  const isMoreActive =
+    pathname === "/about" ||
+    pathname === "/faq" ||
+    pathname === "/contact" ||
+    pathname === "/cancellation-policy" ||
+    pathname === "/terms" ||
+    pathname === "/privacy";
 
   return (
     <>
       {/* 
         ========================================================================
-        PERMANENTLY FIXED TRANSLUCENT NAVBAR & TOP FEATURES BAR
-        - Matches reference image exactly:
-          * Row 1: Logo, 3 Trust Badges (Verified, Prices, Support), Login, List Property
-          * Row 2: Home (underlined), PG & Rooms, Hostels, Flats, Shared Spaces, Services, More, All Cities
-        - Constant across video playback and scroll
+        GLOBAL STAYZY HEADER & NAVIGATION BAR
+        - Unified 65px (mobile/tablet) / 109px (desktop lg+) height across all routes
+        - Overlays dark Hero video seamlessly on `/` with fixed glass styling
+        - Uses sticky top-0 in normal document flow on all other routes so page content
+          always begins cleanly below the header with zero overlap or blank gaps
         ========================================================================
       */}
       <header
         ref={navContainerRef}
-        className="fixed top-0 left-0 w-full z-50 bg-[#08100c]/80 backdrop-blur-md border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)] transition-all select-none"
+        className={`left-0 w-full z-50 h-[65px] lg:h-[109px] backdrop-blur-md transition-colors select-none ${
+          isHomeActive
+            ? "fixed top-0 bg-[#08100c]/80 border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)]"
+            : "sticky top-0 bg-[#061811]/95 border-b border-emerald-950/60 shadow-[0_6px_24px_rgba(0,0,0,0.22)]"
+        }`}
       >
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           {/* ========================================================== */}
@@ -370,32 +414,40 @@ export function Navbar() {
           {/* ========================================================== */}
           {/* ROW 2: BOTTOM NAVIGATION BAR (Home, PG & Rooms, Hostels...) */}
           {/* ========================================================== */}
-          <nav className="hidden lg:flex items-center justify-between py-2.5 text-[13px] font-semibold text-white/90 relative">
-            <div className="flex items-center gap-6 xl:gap-8">
+          <nav
+            aria-label="Primary navigation"
+            className="hidden lg:flex items-center justify-between h-11 text-[13px] font-semibold text-white/90 relative"
+          >
+            <div className="flex items-center gap-6 xl:gap-8 h-full">
               {/* 1. Home (With Green Underline Bar) */}
               <Link
                 href="/"
                 onClick={closeAllMenus}
-                className={`flex items-center gap-1.5 transition-colors relative py-1 ${
+                className={`h-full flex items-center gap-1.5 transition-colors relative ${
                   isHomeActive ? "text-white font-bold" : "text-white/85 hover:text-white"
                 }`}
               >
                 <Home className="w-4 h-4 text-white" />
                 <span>Home</span>
                 {isHomeActive && (
-                  <div className="absolute -bottom-2.5 left-0 right-0 h-[2.5px] bg-[#00B981] rounded-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#00B981] rounded-full" />
                 )}
               </Link>
 
               {/* 2. PG & Rooms ⌄ */}
-              <div className="relative">
+              <div className="relative h-full flex items-center">
                 <button
                   type="button"
                   onClick={() => toggleDropdown("rooms")}
-                  className="flex items-center gap-1 text-white/85 hover:text-white transition-colors cursor-pointer py-1"
+                  className={`h-full flex items-center gap-1 transition-colors cursor-pointer relative ${
+                    isRoomsActive ? "text-white font-bold" : "text-white/85 hover:text-white"
+                  }`}
                 >
                   <span>PG &amp; Rooms</span>
                   <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                  {isRoomsActive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#00B981] rounded-full" />
+                  )}
                 </button>
 
                 {/* PG & Rooms Dropdown */}
@@ -507,14 +559,19 @@ export function Navbar() {
               </div>
 
               {/* 6. Services ⌄ */}
-              <div className="relative">
+              <div className="relative h-full flex items-center">
                 <button
                   type="button"
                   onClick={() => toggleDropdown("services")}
-                  className="flex items-center gap-1 text-white/85 hover:text-white transition-colors cursor-pointer py-1"
+                  className={`h-full flex items-center gap-1 transition-colors cursor-pointer relative ${
+                    isServicesActive ? "text-white font-bold" : "text-white/85 hover:text-white"
+                  }`}
                 >
                   <span>Services</span>
                   <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                  {isServicesActive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#00B981] rounded-full" />
+                  )}
                 </button>
 
                 {activeDropdown === "services" && (
@@ -551,14 +608,19 @@ export function Navbar() {
               </div>
 
               {/* 7. More ⌄ */}
-              <div className="relative">
+              <div className="relative h-full flex items-center">
                 <button
                   type="button"
                   onClick={() => toggleDropdown("more")}
-                  className="flex items-center gap-1 text-white/85 hover:text-white transition-colors cursor-pointer py-1"
+                  className={`h-full flex items-center gap-1 transition-colors cursor-pointer relative ${
+                    isMoreActive ? "text-white font-bold" : "text-white/85 hover:text-white"
+                  }`}
                 >
                   <span>More</span>
                   <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                  {isMoreActive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#00B981] rounded-full" />
+                  )}
                 </button>
 
                 {activeDropdown === "more" && (
@@ -604,15 +666,20 @@ export function Navbar() {
             </div>
 
             {/* 8. All Cities ⌄ (With MapPin Icon) */}
-            <div className="relative">
+            <div className="relative h-full flex items-center">
               <button
                 type="button"
                 onClick={() => toggleDropdown("cities")}
-                className="flex items-center gap-1.5 text-white/90 hover:text-emerald-400 transition-colors cursor-pointer py-1"
+                className={`h-full flex items-center gap-1.5 transition-colors cursor-pointer relative ${
+                  isCitiesActive ? "text-[#00D6A0] font-bold" : "text-white/90 hover:text-emerald-400"
+                }`}
               >
                 <MapPin className="w-4 h-4 text-[#00B981]" />
                 <span className="font-semibold">All Cities</span>
                 <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                {isCitiesActive && (
+                  <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#00B981] rounded-full" />
+                )}
               </button>
 
               {/* All Cities Mega Menu */}
@@ -750,7 +817,7 @@ export function Navbar() {
         {/* MOBILE SLIDE-OUT MENU DRAWER                               */}
         {/* ========================================================== */}
         {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 z-[70] lg:hidden">
             <div
               className="fixed inset-0 bg-black/70 backdrop-blur-sm"
               onClick={() => setMobileMenuOpen(false)}

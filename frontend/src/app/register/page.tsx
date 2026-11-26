@@ -3,8 +3,6 @@
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { Lock, Mail, User, Phone, ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -190,10 +188,8 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
-      <main className="flex-1 flex items-center justify-center">
+    <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] flex flex-col bg-white">
+      <main className="flex-1 flex items-center justify-center py-10 px-4">
         <Suspense fallback={<div className="py-20 text-center text-xs">Loading registration...</div>}>
           <RegisterForm />
         </Suspense>

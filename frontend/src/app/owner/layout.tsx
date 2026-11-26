@@ -100,7 +100,7 @@ export default function OwnerLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center text-xs font-semibold text-[#5E6E65]">
+      <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-white flex items-center justify-center text-xs font-semibold text-[#5E6E65]">
         Loading Stayzy Property Partner Portal...
       </div>
     );
@@ -109,8 +109,7 @@ export default function OwnerLayout({
   // If user is logged in as Customer, show prompt to access Owner portal
   if (user && user.role !== "OWNER" && user.role !== "ADMIN") {
     return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <DemoBanner />
+      <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-white flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <div className="bg-white p-8 rounded-lg border border-[#E8E6DF] max-w-md w-full shadow-card space-y-5">
             <div className="w-14 h-14 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 flex items-center justify-center mx-auto shadow-sm">
@@ -160,12 +159,10 @@ export default function OwnerLayout({
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-
-      {/* Owner Top Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-[#123D2B] text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] flex flex-col bg-white">
+      {/* Contextual Owner Partner Toolbar (Sits cleanly below global Navbar) */}
+      <div className="bg-[#123D2B] text-white border-b border-[#0E2F21]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
@@ -218,13 +215,13 @@ export default function OwnerLayout({
             </button>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main Layout Container */}
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Desktop Owner Sidebar */}
-          <aside className="hidden lg:block lg:col-span-3 sticky top-24 max-h-[calc(100vh-6.5rem)] overflow-y-auto space-y-4">
+          <aside className="hidden lg:block lg:col-span-3 sticky top-[128px] max-h-[calc(100vh-8.75rem)] overflow-y-auto space-y-4">
             <div className="bg-white rounded-lg border border-[#E8E6DF] p-3 shadow-xs">
               <div className="px-3 py-2.5 mb-1 border-b border-[#F0EDE4] flex items-center justify-between">
                 <span className="text-[10px] font-extrabold text-[#7B8B82] uppercase tracking-wider">

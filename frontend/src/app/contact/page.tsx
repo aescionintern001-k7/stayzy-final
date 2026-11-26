@@ -1,15 +1,10 @@
 import React from "react";
-import { DemoBanner } from "@/components/common/DemoBanner";
-import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { MapPin, Phone, Mail, Clock, ShieldCheck } from "lucide-react";
 
 export default function ContactPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <DemoBanner />
-      <Navbar />
-
       <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-12">
         <div className="space-y-3">
           <span className="text-xs uppercase font-extrabold tracking-widest text-[#123D2B]">

@@ -1,5 +1,4 @@
 import React from "react";
-import { Navbar } from "@/components/common/Navbar";
 import { Hero } from "@/components/home/Hero";
 import { HotelServices } from "@/components/home/HotelServices";
 import { CitySelectorStrip } from "@/components/home/CitySelectorStrip";
@@ -14,9 +13,6 @@ import { Footer } from "@/components/common/Footer";
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-white text-[#111827]">
-      {/* 1. Clean Navigation Bar (Zolo Screenshots 2 & 5 style) */}
-      <Navbar />
-
       <main className="flex-1">
         {/* 2. Bright Hero Section (Zolo Screenshot 5 style) */}
         <Hero />
