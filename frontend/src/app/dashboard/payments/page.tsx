@@ -79,10 +79,10 @@ export default function DashboardPaymentsPage() {
                     </td>
                     <td className="p-3.5">
                       <div className="font-semibold text-[#192621]">
-                        {p.booking.roomType.name}
+                        {p.booking?.roomType?.name || p.booking?.property?.name || "Stayzy Stay"}
                       </div>
                       <div className="text-[11px] text-[#7B8B82]">
-                        Ref: {p.booking.bookingReference}
+                        Ref: {p.booking?.bookingReference || "—"}
                       </div>
                     </td>
                     <td className="p-3.5 font-black text-[#192621]">

@@ -130,7 +130,8 @@ function DashboardSupportContent() {
 
                 {t.booking && (
                   <p className="text-[11px] text-[#7B8B82]">
-                    Linked Stay: {t.booking.roomType.name} (Ref: {t.booking.bookingReference})
+                    Linked Stay: {t.booking.roomType?.name || t.booking.property?.name || "Stayzy Stay"}{" "}
+                    {t.booking.bookingReference ? `(Ref: ${t.booking.bookingReference})` : ""}
                   </p>
                 )}
 
@@ -194,7 +195,7 @@ function DashboardSupportContent() {
                     <option value="">None / General Inquiry</option>
                     {bookings.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.roomType.name} ({b.bookingReference})
+                        {b.roomType?.name || b.property?.name || "Stayzy Stay"} ({b.bookingReference})
                       </option>
                     ))}
                   </select>

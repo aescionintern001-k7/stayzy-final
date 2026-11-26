@@ -1,24 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { DemoBanner } from "@/components/common/DemoBanner";
+import { StayzyLogo } from "@/components/common/StayzyLogo";
 import {
   Building2,
   PlusCircle,
   Users,
   CalendarCheck,
   DoorOpen,
-  DollarSign,
   LayoutDashboard,
   ExternalLink,
   LogOut,
   Menu,
   X,
   ChevronRight,
+  ChevronDown,
   ShieldAlert,
 } from "lucide-react";
+
+const OWNER_NAV_ITEMS = [
+  { label: "Partner Overview", href: "/owner", icon: LayoutDashboard },
+  { label: "Upload New PG", href: "/owner/properties/new", icon: PlusCircle },
+  { label: "My PG Properties", href: "/owner/properties", icon: Building2 },
+  { label: "Tenant Bookings", href: "/owner/bookings", icon: CalendarCheck },
+  { label: "Scheduled Visits", href: "/owner/visits", icon: DoorOpen },
+] as const;
 
 export default function OwnerLayout({
   children,
@@ -30,6 +38,28 @@ export default function OwnerLayout({
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileNavOpen(false);
+        setProfileMenuOpen(false);
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     async function checkAuth() {
@@ -53,7 +83,7 @@ export default function OwnerLayout({
             name: "Rajesh Kumar (PG Partner)",
           });
         }
-      } catch (err) {
+      } catch {
         setUser({
           id: "usr-owner-001",
           email: "rajesh.pg@stayzy.com",
@@ -68,6 +98,7 @@ export default function OwnerLayout({
   }, [pathname, router]);
 
   const handleLogout = async () => {
+    setProfileMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };
@@ -100,47 +131,47 @@ export default function OwnerLayout({
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-white flex items-center justify-center text-xs font-semibold text-[#5E6E65]">
+      <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-[#FAF9F4] flex items-center justify-center text-xs font-semibold text-[#064B35]">
         Loading Stayzy Property Partner Portal...
       </div>
     );
   }
 
-  // If user is logged in as Customer, show prompt to access Owner portal
   if (user && user.role !== "OWNER" && user.role !== "ADMIN") {
     return (
-      <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-white flex flex-col">
+      <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-[#FAF9F4] flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="bg-white p-8 rounded-lg border border-[#E8E6DF] max-w-md w-full shadow-card space-y-5">
-            <div className="w-14 h-14 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 flex items-center justify-center mx-auto shadow-sm">
-              <Building2 className="w-7 h-7 text-amber-800" />
+          <div className="bg-white p-8 rounded-[22px] border border-[#E6EAE2] max-w-md w-full shadow-[0_16px_40px_-14px_rgba(23,37,31,0.12)] space-y-5">
+            <div className="w-14 h-14 rounded-[16px] bg-[#E8F4DF] text-[#064B35] border border-[#DCE5D5] flex items-center justify-center mx-auto">
+              <Building2 className="w-7 h-7" />
             </div>
-            <h2 className="text-2xl font-extrabold text-[#123D2B]">Property Owner Access</h2>
-            <p className="text-xs text-[#5E6E65] leading-relaxed">
+            <h2 className="text-2xl font-extrabold text-[#17251F]">Property Owner Access</h2>
+            <p className="text-xs text-[#5F6F67] leading-relaxed">
               You are currently viewing with <strong>{user.role}</strong> permissions ({user.email}). Switch to Property Partner mode to upload and manage your PG buildings.
             </p>
             <div className="pt-2 space-y-2.5">
               <button
+                type="button"
                 onClick={handleSwitchToOwner}
-                className="w-full py-3 rounded-lg bg-[#123D2B] text-white text-xs font-bold hover:bg-[#0E2F21] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                className="w-full py-3 rounded-[12px] bg-[#064B35] text-white text-xs font-bold hover:bg-[#043827] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
               >
-                <Building2 className="w-4 h-4 text-amber-300" />
-                Enter as Property Owner
+                <Building2 className="w-4 h-4 text-[#E8F4DF]" />
+                <span>Enter as Property Owner</span>
               </button>
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Link
                   href="/admin"
-                  className="py-2.5 px-3 rounded-lg border border-[#D5D2C7] text-xs font-bold text-[#123D2B] hover:bg-[#FAF8F5] flex items-center justify-center gap-1.5"
+                  className="py-2.5 px-3 rounded-[12px] border border-[#D4DCD0] text-xs font-bold text-[#17251F] hover:bg-[#FAF9F4] flex items-center justify-center gap-1.5"
                 >
-                  <ShieldAlert className="w-3.5 h-3.5 text-emerald-700" />
-                  Admin Portal
+                  <ShieldAlert className="w-3.5 h-3.5 text-[#009B69]" />
+                  <span>Admin Portal</span>
                 </Link>
                 <Link
                   href="/dashboard"
-                  className="py-2.5 px-3 rounded-lg border border-[#D5D2C7] text-xs font-bold text-[#123D2B] hover:bg-[#FAF8F5] flex items-center justify-center gap-1.5"
+                  className="py-2.5 px-3 rounded-[12px] border border-[#D4DCD0] text-xs font-bold text-[#17251F] hover:bg-[#FAF9F4] flex items-center justify-center gap-1.5"
                 >
-                  <Users className="w-3.5 h-3.5 text-[#5E6E65]" />
-                  Resident App
+                  <Users className="w-3.5 h-3.5 text-[#5F6F67]" />
+                  <span>Resident App</span>
                 </Link>
               </div>
             </div>
@@ -150,145 +181,276 @@ export default function OwnerLayout({
     );
   }
 
-  const ownerNavItems = [
-    { label: "Partner Overview", href: "/owner", icon: LayoutDashboard },
-    { label: "+ Upload New PG", href: "/owner/properties/new", icon: PlusCircle, highlight: true },
-    { label: "My PG Properties", href: "/owner/properties", icon: Building2 },
-    { label: "Tenant Bookings", href: "/owner/bookings", icon: CalendarCheck },
-    { label: "Scheduled Visits", href: "/owner/visits", icon: DoorOpen },
-  ];
-
   return (
-    <div className="min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] flex flex-col bg-white">
-      {/* Contextual Owner Partner Toolbar (Sits cleanly below global Navbar) */}
-      <div className="bg-[#123D2B] text-white border-b border-[#0E2F21]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setMobileNavOpen(!mobileNavOpen)}
-              className="lg:hidden p-2 rounded-md text-white hover:bg-white/10"
-              aria-label="Toggle owner menu"
-            >
-              {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+    <div className="relative min-h-[calc(100vh-65px)] lg:min-h-[calc(100vh-109px)] bg-[#FAF9F4] text-[#17251F] overflow-x-hidden">
+      {/* Subtle Outer Botanical Accent */}
+      <svg
+        viewBox="0 0 160 140"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="pointer-events-none hidden xl:block absolute top-0 left-1/2 -translate-x-24 w-44 h-36 text-[#009B69]/15"
+        aria-hidden="true"
+      >
+        <path
+          d="M84 128C68 88 46 52 16 14M66 94C42 88 26 70 30 50C52 54 66 72 66 94ZM92 78C112 68 124 48 116 30C96 36 84 56 92 78Z"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
 
-            <Link href="/owner" className="flex items-center gap-2.5">
-              <img
-                src="/stayzy-logo.png"
-                alt="Stayzy Logo"
-                className="h-8 w-auto object-contain brightness-0 invert drop-shadow-sm rounded-md"
-              />
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-400 text-[#123D2B] tracking-wide uppercase">
-                Property Partner
-              </span>
-            </Link>
-          </div>
+      <div className="relative z-10 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex gap-6 xl:gap-7 items-start">
+        {/* Desktop Deep Forest-Green Sidebar (Unified with Resident Dashboard) */}
+        <aside className="hidden lg:flex lg:w-[250px] shrink-0 sticky top-[126px] max-h-[calc(100vh-146px)]">
+          <nav
+            aria-label="Partner Console Navigation"
+            className="w-full bg-[#064B35] text-white rounded-[24px] p-4 shadow-[0_20px_50px_-16px_rgba(6,75,53,0.42)] flex flex-col justify-between gap-4 overflow-y-auto"
+          >
+            <div>
+              <div className="px-2 pt-1 pb-4 flex items-center justify-between gap-2">
+                <Link href="/owner" className="inline-flex items-center focus:outline-none">
+                  <StayzyLogo variant="light" size="md" />
+                </Link>
+              </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/owner/properties/new"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white text-[#123D2B] text-xs font-extrabold hover:bg-slate-100 transition-colors shadow-xs"
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-emerald-700" />
-              <span>List New PG</span>
-            </Link>
-
-            <Link
-              href="/"
-              target="_blank"
-              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-colors"
-            >
-              <span>View Live Website</span>
-              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-            </Link>
-
-            <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-white/20 text-xs">
-              <span className="text-white font-semibold">{user?.name || "Rajesh Kumar"}</span>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-              title="Sign out of Partner Console"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Layout Container */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Desktop Owner Sidebar */}
-          <aside className="hidden lg:block lg:col-span-3 sticky top-[128px] max-h-[calc(100vh-8.75rem)] overflow-y-auto space-y-4">
-            <div className="bg-white rounded-lg border border-[#E8E6DF] p-3 shadow-xs">
-              <div className="px-3 py-2.5 mb-1 border-b border-[#F0EDE4] flex items-center justify-between">
-                <span className="text-[10px] font-extrabold text-[#7B8B82] uppercase tracking-wider">
-                  Partner Console
+              <div className="px-2.5 pb-2.5 flex items-center justify-between">
+                <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-[#E8F4DF]/75">
+                  PARTNER CONSOLE
                 </span>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                  Landlord Mode
+                <span className="px-2 py-0.5 rounded-[9999px] bg-[#E8F4DF]/15 text-[#E8F4DF] text-[9.5px] font-bold">
+                  Landlord
                 </span>
               </div>
-              <nav className="space-y-1">
-                {ownerNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = pathname === item.href;
 
+              <div className="space-y-1">
+                {OWNER_NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const active = pathname === item.href;
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-md text-xs font-bold transition-all ${
-                        item.highlight && !isActive
-                          ? "bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
-                          : isActive
-                          ? "bg-[#123D2B] text-white shadow-xs"
-                          : "text-[#4A5550] hover:text-[#123D2B] hover:bg-[#FAF8F5]"
+                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-[12px] text-[13px] transition-all duration-200 ${
+                        active
+                          ? "bg-[#E8F4DF] text-[#064B35] font-bold shadow-xs"
+                          : "text-white/85 hover:text-white hover:bg-white/10 font-medium"
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
+                      <span className="flex items-center gap-2.5">
                         <Icon
-                          className={`w-4 h-4 ${
-                            isActive
-                              ? "text-emerald-300"
-                              : item.highlight
-                              ? "text-amber-700"
-                              : "text-[#7B8B82]"
+                          className={`w-[17px] h-[17px] ${
+                            active ? "text-[#064B35]" : "text-[#E8F4DF]/90"
                           }`}
+                          aria-hidden="true"
                         />
                         <span>{item.label}</span>
-                      </div>
-                      {isActive && <ChevronRight className="w-3.5 h-3.5 text-white" />}
+                      </span>
+                      {active && <ChevronRight className="w-4 h-4 text-[#064B35]" />}
                     </Link>
                   );
                 })}
-              </nav>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-white/12">
+                <Link
+                  href="/owner/properties/new"
+                  className="flex items-center justify-center gap-2 w-full px-3.5 py-2.5 rounded-[12px] text-[13px] font-semibold text-white bg-white/10 hover:bg-white/18 border border-white/15 transition-all duration-200"
+                >
+                  <PlusCircle className="w-4 h-4 text-[#E8F4DF]" aria-hidden="true" />
+                  <span>List New PG</span>
+                </Link>
+              </div>
             </div>
 
-            {/* Quick Upload Banner */}
-            <div className="p-4 rounded-lg bg-gradient-to-br from-[#123D2B] to-[#1E543C] text-white space-y-2 shadow-xs">
-              <span className="text-xs font-bold flex items-center gap-1.5 text-white">
-                <Building2 className="w-4 h-4 text-amber-300" />
-                Zero Listing Fee
-              </span>
-              <p className="text-[11px] text-[#C1D2C5] leading-relaxed">
-                Upload your PG property with genuine room photos and start receiving verified booking requests within hours.
-              </p>
-              <Link
-                href="/owner/properties/new"
-                className="inline-block mt-1 w-full text-center py-2 rounded-md bg-white text-[#123D2B] text-xs font-bold hover:bg-slate-100 transition-colors shadow-xs"
+            {/* Bottom Compact Promotional Card */}
+            <div className="relative rounded-[16px] overflow-hidden bg-[#043626] border border-white/12 p-3.5 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-extrabold text-white leading-tight">
+                  Zero Listing
+                  <br />
+                  Fee Portal
+                </p>
+                <p className="text-[10.5px] text-[#E8F4DF]/80 mt-1 leading-snug">
+                  Verified stays, zero brokerage.
+                </p>
+              </div>
+              <img
+                src="/images/rooms/twin-sharing-main.webp?v=5"
+                alt="Stayzy partner property"
+                className="w-14 h-14 rounded-[10px] object-cover border border-white/15 shrink-0"
+              />
+            </div>
+          </nav>
+        </aside>
+
+        {/* Right Main Column */}
+        <div className="flex-1 min-w-0 flex flex-col gap-5">
+          {/* Clean Top Navigation Bar */}
+          <header className="flex items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="lg:hidden p-2.5 rounded-[12px] bg-white border border-[#E4E8DF] text-[#064B35] hover:bg-[#E8F4DF]/60 transition-colors cursor-pointer"
+                aria-label="Open owner menu"
               >
-                Upload Property Now
+                <Menu className="w-5 h-5" />
+              </button>
+
+              <Link href="/owner" className="lg:hidden inline-flex items-center">
+                <StayzyLogo variant="dark" size="sm" />
               </Link>
             </div>
-          </aside>
+
+            <div className="flex items-center gap-2.5 sm:gap-3 ml-auto">
+              <Link
+                href="/owner/properties/new"
+                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-[9999px] bg-white border border-[#DCE2D7] text-[12.5px] font-bold text-[#17251F] hover:border-[#009B69]/45 hover:bg-[#E8F4DF]/45 transition-all shadow-2xs whitespace-nowrap shrink-0"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-[#064B35] shrink-0" aria-hidden="true" />
+                <span>List New PG</span>
+              </Link>
+
+              <span className="hidden sm:inline-block w-px h-5 bg-[#E2E6DC]" aria-hidden="true" />
+
+              <Link
+                href="/"
+                target="_blank"
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[9999px] bg-white border border-[#DCE2D7] text-[12.5px] font-bold text-[#17251F] hover:border-[#009B69]/45 hover:bg-[#E8F4DF]/45 transition-all shadow-2xs whitespace-nowrap shrink-0"
+              >
+                <span>View Live Website</span>
+                <ExternalLink className="w-3.5 h-3.5 text-[#064B35] shrink-0" aria-hidden="true" />
+              </Link>
+
+              <span className="hidden md:inline-block w-px h-5 bg-[#E2E6DC]" aria-hidden="true" />
+
+              {user && (
+                <div className="relative" ref={profileRef}>
+                  <button
+                    type="button"
+                    onClick={() => setProfileMenuOpen((prev) => !prev)}
+                    aria-expanded={profileMenuOpen}
+                    className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-[9999px] hover:bg-white border border-transparent hover:border-[#E4E8DF] transition-all cursor-pointer"
+                  >
+                    <div className="w-9 h-9 rounded-[9999px] bg-[#064B35] text-white flex items-center justify-center font-extrabold text-[13px] shrink-0 shadow-xs">
+                      {user.name?.charAt(0)?.toUpperCase() || "P"}
+                    </div>
+                    <div className="hidden md:block text-left">
+                      <span className="text-[13px] font-bold text-[#17251F] block leading-tight">
+                        {user.name || "Rajesh Kumar (PG Partner)"}
+                      </span>
+                      <span className="text-[11px] text-[#5F6F67] block leading-tight">
+                        {user.email || "rajesh.pg@stayzy.com"}
+                      </span>
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-[#5F6F67] transition-transform ${
+                        profileMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {profileMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-[16px] border border-[#E4E8DF] shadow-[0_18px_40px_-14px_rgba(23,37,31,0.18)] p-2 z-50">
+                      <Link
+                        href="/owner/properties"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-semibold text-[#17251F] hover:bg-[#E8F4DF]/60"
+                      >
+                        <Building2 className="w-4 h-4 text-[#064B35]" />
+                        <span>My PG Properties</span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </header>
 
           {/* Main Owner Content */}
-          <main className="lg:col-span-9">{children}</main>
+          <main className="flex-1 min-w-0">{children}</main>
         </div>
       </div>
+
+      {/* Mobile Owner Navigation Drawer */}
+      {mobileNavOpen && (
+        <div className="lg:hidden fixed inset-0 z-[70] bg-black/55 flex">
+          <div className="w-72 bg-[#064B35] text-white h-full p-5 shadow-2xl flex flex-col justify-between overflow-y-auto">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-white/15">
+                <Link href="/owner" onClick={() => setMobileNavOpen(false)}>
+                  <StayzyLogo variant="light" size="sm" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setMobileNavOpen(false)}
+                  className="p-1.5 rounded-[10px] text-white/80 hover:text-white hover:bg-white/10"
+                  aria-label="Close owner menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="px-2 text-[10.5px] font-bold uppercase tracking-[0.14em] text-[#E8F4DF]/75">
+                PARTNER CONSOLE
+              </div>
+
+              <div className="space-y-1">
+                {OWNER_NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const active = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileNavOpen(false)}
+                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-[12px] text-[13px] transition-all ${
+                        active
+                          ? "bg-[#E8F4DF] text-[#064B35] font-bold"
+                          : "text-white/85 hover:text-white hover:bg-white/10 font-medium"
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <Icon className="w-4 h-4" />
+                        <span>{item.label}</span>
+                      </span>
+                      {active && <ChevronRight className="w-4 h-4 text-[#064B35]" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-white/15 space-y-2.5">
+              <Link
+                href="/owner/properties/new"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[12px] text-xs font-bold bg-[#E8F4DF] text-[#064B35]"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>List New PG</span>
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-2 w-full py-2 rounded-[10px] text-xs font-medium text-white/75 hover:text-white"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1" onClick={() => setMobileNavOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }

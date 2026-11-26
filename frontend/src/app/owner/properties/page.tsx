@@ -65,7 +65,7 @@ export default function OwnerPropertiesListPage() {
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-[#123D2B] text-white text-xs font-bold hover:bg-[#0E2F21] shadow-sm transition-colors"
         >
           <PlusCircle className="w-4 h-4 text-[#E8F1D5]" />
-          <span>+ Upload New PG</span>
+          <span>Upload New PG</span>
         </Link>
       </div>
 
