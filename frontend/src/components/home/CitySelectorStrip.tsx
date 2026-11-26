@@ -68,8 +68,8 @@ const CITIES: CityItem[] = [
 
 export function CitySelectorStrip() {
   const router = useRouter();
-  // Bengaluru is highlighted by default in the design specification
-  const [activeCity, setActiveCity] = useState<string>("Bengaluru");
+  const [activeCity, setActiveCity] = useState<string | null>(null);
+  const [hoveredCity, setHoveredCity] = useState<string | null>(null);
 
   const handleSelectCity = (city: CityItem) => {
     setActiveCity(city.name);
@@ -144,33 +144,49 @@ export function CitySelectorStrip() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 lg:gap-4 items-stretch">
           {CITIES.map((city) => {
             const isSelected = activeCity === city.name;
+            const isHovered = hoveredCity === city.name;
 
             return (
               <button
                 key={city.id}
                 type="button"
                 onClick={() => handleSelectCity(city)}
-                className={`group relative rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex flex-col items-center justify-between text-center cursor-pointer transition-all duration-300 overflow-hidden border-[1.5px] ${
-                  isSelected
-                    ? "bg-white border-[#079B50] shadow-[0_10px_26px_rgba(7,155,80,0.14)] -translate-y-1.5 ring-1 ring-[#079B50]/30"
-                    : "bg-white border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)] hover:border-[#079B50]/60 hover:shadow-[0_12px_28px_rgba(7,155,80,0.12)] hover:-translate-y-1.5"
+                onMouseEnter={() => setHoveredCity(city.name)}
+                onMouseLeave={() => setHoveredCity(null)}
+                onBlur={() => setHoveredCity((prev) => (prev === city.name ? null : prev))}
+                className={`group relative rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex flex-col items-center justify-between text-center cursor-pointer transition-all duration-300 overflow-hidden border-[1.5px] bg-white ${
+                  isHovered
+                    ? "border-[#079B50]/80 shadow-[0_12px_28px_rgba(7,155,80,0.14)] -translate-y-1.5"
+                    : isSelected
+                    ? "border-[#079B50] shadow-[0_4px_16px_rgba(7,155,80,0.10)] ring-1 ring-[#079B50]/20"
+                    : "border-[#E5EDE7] shadow-[0_4px_16px_rgba(0,0,0,0.03)]"
                 }`}
               >
-                {/* Subtle Top Backdrop Gradient inside card */}
+                {/* Subtle Top Backdrop Gradient inside card (only intensifies on hover) */}
                 <div
                   className={`absolute inset-x-0 top-0 h-32 pointer-events-none transition-opacity duration-300 ${
-                    isSelected
+                    isHovered
                       ? "bg-gradient-to-b from-[#EAF8F0] via-white/80 to-transparent opacity-100"
-                      : "bg-gradient-to-b from-[#F2F9F5] via-white/60 to-transparent opacity-70 group-hover:opacity-100"
+                      : "bg-gradient-to-b from-[#F2F9F5] via-white/60 to-transparent opacity-65"
                   }`}
                 />
+
+                {/* Selected indicator dot (distinct from hover animation) */}
+                {isSelected && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-3 right-3 z-20 w-2 h-2 rounded-full bg-[#079B50]"
+                  />
+                )}
 
                 {/* Standardized 3D Landmark Illustration Showcase */}
                 <div className="relative z-10 w-full h-24 sm:h-28 flex items-center justify-center p-1 mb-2">
                   <img
                     src={city.image}
                     alt={`${city.name} Landmark - ${city.landmark}`}
-                    className="max-h-full max-w-full object-contain object-center transform group-hover:scale-106 transition-transform duration-300 ease-out drop-shadow-xs"
+                    className={`max-h-full max-w-full object-contain object-center transform transition-transform duration-300 ease-out drop-shadow-xs ${
+                      isHovered ? "scale-105" : "scale-100"
+                    }`}
                     loading="lazy"
                   />
                 </div>
@@ -179,7 +195,7 @@ export function CitySelectorStrip() {
                 <div className="relative z-10 w-full flex flex-col items-center pt-0.5 pb-1">
                   <h3
                     className={`text-sm sm:text-base font-extrabold tracking-tight transition-colors duration-200 leading-snug ${
-                      isSelected ? "text-[#079B50]" : "text-[#17212B] group-hover:text-[#079B50]"
+                      isHovered || isSelected ? "text-[#079B50]" : "text-[#17212B]"
                     }`}
                   >
                     {city.name}
@@ -190,12 +206,10 @@ export function CitySelectorStrip() {
                   </span>
                 </div>
 
-                {/* Bottom Emerald Accent Bar (Exact Reference Match) */}
+                {/* Bottom Emerald Accent Bar (visible ONLY on hover) */}
                 <div
                   className={`absolute inset-x-4 bottom-0 h-1 rounded-full bg-[#079B50] transition-all duration-300 ${
-                    isSelected
-                      ? "opacity-100 scale-x-100"
-                      : "opacity-0 scale-x-50 group-hover:opacity-100 group-hover:scale-x-100"
+                    isHovered ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50"
                   }`}
                 />
               </button>

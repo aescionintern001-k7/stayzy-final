@@ -37,6 +37,7 @@ export function Hero() {
   const [destination, setDestination] = useState("");
   const [destFocused, setDestFocused] = useState(false);
   const [selectedCity, setSelectedCity] = useState("Nearby");
+  const [selectedCorridor, setSelectedCorridor] = useState("Nearby (Current Loc)");
   const [nearbyOpen, setNearbyOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
@@ -122,7 +123,7 @@ export function Hero() {
   ];
 
   return (
-    <div className="relative w-full min-h-[780px] lg:min-h-[900px] flex flex-col justify-between overflow-hidden bg-[#0c130e] text-white pt-24 sm:pt-32 lg:pt-36">
+    <div className="relative z-20 w-full min-h-[780px] lg:min-h-[900px] flex flex-col justify-between overflow-x-clip overflow-y-visible bg-[#0c130e] text-white pt-24 sm:pt-32 lg:pt-36">
       {/* ======================================================== */}
       {/* 1. CINEMATIC VIDEO BACKGROUND & PRECISE GRADIENT OVERLAYS */}
       {/* ======================================================== */}
@@ -177,7 +178,7 @@ export function Hero() {
       {/* ======================================================== */}
       {/* 4. HERO CENTER: HEADLINE, SUBTITLE, SEARCH PANEL & STATS */}
       {/* ======================================================== */}
-      <main className="relative z-20 w-full max-w-[1480px] mx-auto px-4 sm:px-8 lg:px-12 pt-8 pb-16 lg:py-16 my-auto">
+      <main className="relative z-30 w-full max-w-[1480px] mx-auto px-4 sm:px-8 lg:px-12 pt-8 pb-16 lg:py-16 my-auto">
         <div className="max-w-3xl space-y-4 sm:space-y-5 text-left">
           {/* Main Headline (Exact screenshot line arrangement & colors) */}
           <h1 className="text-4xl sm:text-6xl lg:text-[72px] font-black text-white tracking-tight leading-[1.05] drop-shadow-lg font-sans">
@@ -260,27 +261,43 @@ export function Hero() {
               </button>
 
               {nearbyOpen && (
-                <div className="absolute top-full left-0 mt-3 w-60 bg-white rounded-xl shadow-2xl border border-gray-100 p-2 z-50 space-y-1 text-xs">
-                  <div className="px-2.5 py-1 text-[10px] font-bold text-gray-400 uppercase">
+                <div
+                  role="listbox"
+                  aria-label="Select Location or Corridor"
+                  className="absolute top-full left-0 mt-3 w-64 sm:w-68 bg-white rounded-xl shadow-2xl border border-gray-100 p-2 z-[70] text-xs max-h-[280px] sm:max-h-[320px] overflow-y-auto overscroll-contain space-y-0.5"
+                >
+                  <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase sticky top-0 bg-white z-10">
                     Select Location / Corridor
                   </div>
-                  {popularCorridors.map((c) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCity(c.city);
-                        if (c.city !== "Nearby") setDestination(c.name);
-                        setNearbyOpen(false);
-                      }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 text-gray-700 font-semibold flex items-center justify-between cursor-pointer"
-                    >
-                      <span>{c.name}</span>
-                      {selectedCity === c.city && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#00B86B]" />
-                      )}
-                    </button>
-                  ))}
+                  {popularCorridors.map((c) => {
+                    const isRowSelected = selectedCorridor === c.name;
+                    return (
+                      <button
+                        key={c.name}
+                        type="button"
+                        role="option"
+                        aria-selected={isRowSelected}
+                        onClick={() => {
+                          setSelectedCity(c.city);
+                          setSelectedCorridor(c.name);
+                          if (c.city !== "Nearby") {
+                            setDestination(c.name);
+                          }
+                          setNearbyOpen(false);
+                        }}
+                        className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors font-semibold flex items-center justify-between gap-2 cursor-pointer ${
+                          isRowSelected
+                            ? "bg-emerald-50/80 text-[#00834F]"
+                            : "text-gray-700 hover:bg-emerald-50 hover:text-[#00834F]"
+                        }`}
+                      >
+                        <span className="truncate">{c.name}</span>
+                        {isRowSelected && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#00B86B] shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -546,7 +563,7 @@ export function Hero() {
       {/* ======================================================== */}
       {/* 7. ORGANIC WHITE BOTTOM WAVE (TRANSITION TO REST OF PAGE)*/}
       {/* ======================================================== */}
-      <div className="relative z-20 w-full overflow-hidden leading-none -mb-px">
+      <div className="relative z-10 w-full overflow-hidden leading-none -mb-px pointer-events-none">
         <svg
           viewBox="0 0 1440 90"
           fill="none"
