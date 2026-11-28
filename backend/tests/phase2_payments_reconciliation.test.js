@@ -264,18 +264,18 @@ test("Payments: idempotency_key prevents duplicate order creation & strict schem
 });
 
 test("Payments: fail -> retry order -> webhook deduplication & atomic booking confirmation + reconcile", async () => {
-  // 1. Create order & simulate PENDING, then FAILED
-  const simPend = await fetch(`${baseUrl}/payments/demo-simulate`, {
+  // 1. Create initial order, then mark it FAILED
+  const initOrder = await fetch(`${baseUrl}/payments/create-order`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${guestToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ booking_id: retryBookingId, outcome: "PENDING" }),
+    body: JSON.stringify({ booking_id: retryBookingId }),
   });
-  const simPendBody = await simPend.json();
-  assert.equal(simPend.status, 200);
-  assert.equal(simPendBody.data.payment.status, "pending");
+  const initOrderBody = await initOrder.json();
+  assert.equal(initOrder.status, 201);
+  const initialOrderId = initOrderBody.data.order.id;
 
   const failRes = await fetch(`${baseUrl}/payments/fail`, {
     method: "POST",
@@ -284,7 +284,7 @@ test("Payments: fail -> retry order -> webhook deduplication & atomic booking co
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      razorpay_order_id: simPendBody.data.payment.razorpay_order_id,
+      razorpay_order_id: initialOrderId,
       error_code: "BAD_REQUEST_ERROR",
       error_description: "Bank timeout",
     }),
@@ -302,7 +302,7 @@ test("Payments: fail -> retry order -> webhook deduplication & atomic booking co
   });
   const retryBody = await retryOrder.json();
   assert.equal(retryOrder.status, 201);
-  assert.notEqual(retryBody.data.order.id, simPendBody.data.payment.razorpay_order_id);
+  assert.notEqual(retryBody.data.order.id, initialOrderId);
 
   // 3. Deliver signed webhook with event.id -> updates BOTH payment AND booking
   const eventId = `evt_${suffix}`;
@@ -400,7 +400,10 @@ test("Security: demo-simulate strictly returns 403 Forbidden when NODE_ENV=produ
       env: {
         ...process.env,
         NODE_ENV: "production",
-        JWT_SECRET: "production_test_jwt_secret_at_least_32_characters_long",
+        CORS_ORIGIN: "https://stayzy.example.com",
+        DB_NAME: "stayzy_prod_validation",
+        DB_PASSWORD: process.env.DB_PASSWORD || "prod_validation_password",
+        JWT_SECRET: "production_subprocess_validation_key_at_least_32_chars_long",
         RAZORPAY_KEY_ID: "rzp_live_mocked_production_key",
         RAZORPAY_KEY_SECRET: "rzp_live_mocked_production_secret",
         RAZORPAY_WEBHOOK_SECRET: "rzp_live_mocked_webhook_secret",

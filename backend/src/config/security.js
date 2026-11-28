@@ -62,3 +62,16 @@ export const authRateLimiter = rateLimit({
   ),
   skip: (req) => req.method === "OPTIONS",
 });
+
+export const demoSimulatorRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: isProduction ? 10 : (process.env.NODE_ENV === "test" ? 100 : 30),
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    req.user?.id ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip || "127.0.0.1")}`,
+  handler: makeRateLimitHandler(
+    "Too many demo payment simulation attempts. Please wait before retrying."
+  ),
+  skip: (req) => req.method === "OPTIONS",
+});

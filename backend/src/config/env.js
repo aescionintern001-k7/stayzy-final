@@ -18,6 +18,10 @@ export const envSchema = z
       .union([z.boolean(), z.string()])
       .optional()
       .transform((val) => val === true || val === "true"),
+    ALLOW_DEMO_PROPERTY_SIMULATOR: z
+      .union([z.boolean(), z.string()])
+      .optional()
+      .transform((val) => val === true || val === "true"),
     CORS_ORIGIN: z.string().default("http://localhost:3000"),
     DATABASE_URL: z.string().optional(),
     DB_SSL: z
@@ -80,6 +84,23 @@ export const envSchema = z
           path: ["ALLOW_DEV_PAYMENT_SIMULATOR"],
           message: "ALLOW_DEV_PAYMENT_SIMULATOR must be false in production",
         });
+      }
+
+      if (data.ALLOW_DEMO_PROPERTY_SIMULATOR) {
+        if (data.APP_ENV !== "staging") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["ALLOW_DEMO_PROPERTY_SIMULATOR"],
+            message: "ALLOW_DEMO_PROPERTY_SIMULATOR is only allowed when APP_ENV=staging",
+          });
+        }
+        if (!data.RAZORPAY_KEY_ID || !data.RAZORPAY_KEY_ID.startsWith("rzp_test_")) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["ALLOW_DEMO_PROPERTY_SIMULATOR"],
+            message: "ALLOW_DEMO_PROPERTY_SIMULATOR requires a test RAZORPAY_KEY_ID (rzp_test_*)",
+          });
+        }
       }
 
       const corsOrigins = data.CORS_ORIGIN.split(",")
@@ -155,3 +176,9 @@ if (!parsedEnv.success) {
 export const env = Object.freeze(parsedEnv.data);
 export const isProduction = env.NODE_ENV === "production";
 export const isDevelopment = env.NODE_ENV === "development";
+
+export const isDemoPropertySimulatorEnabled = (config = env) =>
+  config?.APP_ENV === "staging" &&
+  config?.ALLOW_DEMO_PROPERTY_SIMULATOR === true &&
+  typeof config?.RAZORPAY_KEY_ID === "string" &&
+  config.RAZORPAY_KEY_ID.startsWith("rzp_test_");

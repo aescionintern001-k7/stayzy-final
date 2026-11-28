@@ -73,6 +73,12 @@ export default async function BookingConfirmationPage({
               paymentStatus: String(b.payment_status || "unpaid").toUpperCase(),
               status: String(b.status || "pending").toUpperCase(),
               keylessPin: b.keyless_pin || null,
+              isDemo: Boolean(
+                b.is_demo ||
+                  b.payment_provider === "DEMO_SIMULATOR" ||
+                  String(b.property_title || "").startsWith("[DEMO]") ||
+                  String(b.room_type_name || "").startsWith("[DEMO]")
+              ),
               paymentSchedules: [],
             };
           }
@@ -103,6 +109,13 @@ export default async function BookingConfirmationPage({
             <span className="text-xs uppercase font-extrabold tracking-widest text-[#123D2B]">
               Booking Confirmed
             </span>
+            {booking.isDemo && (
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-extrabold tracking-wide">
+                  DEMO BOOKING · SIMULATED PAYMENT · NO REAL MONEY CHARGED
+                </span>
+              </div>
+            )}
             <h1 className="text-3xl sm:text-4xl font-extrabold text-[#123D2B]">
               You’re all set for Stayzy!
             </h1>

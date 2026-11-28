@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import pool from "../../database/pool.js";
-import { env } from "../../config/env.js";
+import { env, isDemoPropertySimulatorEnabled } from "../../config/env.js";
 import {
   createRazorpayOrder,
   processRazorpayRefund,
@@ -1009,11 +1009,47 @@ export const reconcilePayment = async (
 /**
  * Development/Test ONLY payment simulator (strictly forbidden in production).
  */
+const assertDemoPropertyEligible = async (executor, bookingId, user) => {
+  const eligRes = await executor.query(
+    `
+      SELECT b.guest_id, p.id AS property_id, p.is_demo, h.email AS host_email
+      FROM bookings b
+      JOIN properties p ON p.id = b.property_id
+      JOIN users h ON h.id = p.host_id
+      WHERE b.id = $1
+      LIMIT 1
+    `,
+    [bookingId]
+  );
+  const elig = eligRes.rows[0];
+  if (!elig) {
+    const error = new Error("Booking not found");
+    error.status = 404;
+    throw error;
+  }
+  if (user && elig.guest_id !== user.id && user.role !== "admin") {
+    const error = new Error("You are not authorized to simulate this payment");
+    error.status = 403;
+    throw error;
+  }
+  if (elig.is_demo !== true || elig.host_email !== "demo.catalog@stayzy.local") {
+    const error = new Error(
+      "Simulated payments are strictly restricted to verified demo properties"
+    );
+    error.status = 403;
+    throw error;
+  }
+  return elig;
+};
+
+/**
+ * Staging-only DEMO-property payment simulator (strictly forbidden in production or for real properties).
+ */
 export const demoSimulatePayment = async (
   user,
   { booking_id, razorpay_order_id, payment_schedule_id = null, outcome = "SUCCESS" }
 ) => {
-  if (env.NODE_ENV === "production") {
+  if (!isDemoPropertySimulatorEnabled(env)) {
     const error = new Error(
       "Secure Payment Portal simulator is strictly disabled in production"
     );
@@ -1023,6 +1059,8 @@ export const demoSimulatePayment = async (
 
   let targetOrderId = razorpay_order_id;
   if (!targetOrderId && booking_id) {
+    // Validate booking ownership and DB-backed demo eligibility BEFORE creating any payment order
+    await assertDemoPropertyEligible(pool, booking_id, user);
     const created = await createPaymentOrder(user.id, {
       booking_id,
       payment_schedule_id,
@@ -1050,6 +1088,8 @@ export const demoSimulatePayment = async (
       error.status = 403;
       throw error;
     }
+
+    await assertDemoPropertyEligible(client, payment.booking_id, user);
 
     if (payment.status === "captured") {
       await client.query("COMMIT");

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validateRequest.js";
-import { bookingMutationLimiter } from "../../config/security.js";
+import { bookingMutationLimiter, demoSimulatorRateLimiter } from "../../config/security.js";
 import {
   createOrder,
   verifyPayment,
@@ -65,9 +65,10 @@ router.post(
   reconcilePayment
 );
 
-// 4c. Dev/Test-only payment simulator (returns 403 Forbidden in production)
+// 4c. Staging-only DEMO-property payment simulator (returns 403 Forbidden in production or for real properties)
 router.post(
   "/demo-simulate",
+  demoSimulatorRateLimiter,
   validateRequest({ body: demoSimulateSchema }),
   demoSimulate
 );

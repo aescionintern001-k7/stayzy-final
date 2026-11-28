@@ -222,7 +222,8 @@ export async function seedDemoProperties() {
           UPDATE properties
           SET description = $1, price_per_night = $2, address = $3, city = $4,
               state = $5, country = $6, postal_code = $7, latitude = $8, longitude = $9,
-              amenities = $10::jsonb, images = $11::jsonb, status = 'active', is_available = true
+              amenities = $10::jsonb, images = $11::jsonb, status = 'active', is_available = true,
+              is_demo = TRUE
           WHERE id = $12
           `,
           [
@@ -246,11 +247,11 @@ export async function seedDemoProperties() {
           INSERT INTO properties (
             host_id, title, description, property_type, room_type, price_per_night,
             currency, address, city, state, country, postal_code, latitude, longitude,
-            amenities, images, status, is_available, average_rating, reviews_count
+            amenities, images, status, is_available, is_demo, average_rating, reviews_count
           )
           VALUES (
             $1, $2, $3, $4, $5, $6, 'INR', $7, $8, $9, $10, $11, $12, $13,
-            $14::jsonb, $15::jsonb, 'active', true, 4.8, 12
+            $14::jsonb, $15::jsonb, 'active', true, TRUE, 4.8, 12
           )
           RETURNING id
           `,

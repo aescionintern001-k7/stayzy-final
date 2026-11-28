@@ -1,5 +1,5 @@
 import paymentsService from "./payments.service.js";
-import { env } from "../../config/env.js";
+import { env, isDemoPropertySimulatorEnabled } from "../../config/env.js";
 
 export const createOrder = async (req, res, next) => {
   try {
@@ -140,7 +140,7 @@ export const reconcilePayment = async (req, res, next) => {
 
 export const demoSimulate = async (req, res, next) => {
   try {
-    if (env.NODE_ENV === "production") {
+    if (!isDemoPropertySimulatorEnabled(env)) {
       return res.status(403).json({
         success: false,
         message: "Secure Payment Portal simulator is strictly disabled in production",
@@ -149,7 +149,7 @@ export const demoSimulate = async (req, res, next) => {
     const result = await paymentsService.demoSimulatePayment(req.user, req.body);
     return res.status(200).json({
       success: true,
-      message: "Development payment simulation completed",
+      message: "Demo property payment simulation completed",
       data: result,
     });
   } catch (error) {

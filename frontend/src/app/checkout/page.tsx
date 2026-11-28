@@ -930,6 +930,13 @@ function CheckoutContent() {
               <h3 className="text-xl font-extrabold text-[#064E38]">
                 Stayzy Secure Payment Portal
               </h3>
+              {(roomData?.name?.startsWith("[DEMO]") ||
+                roomData?.property?.name?.startsWith("[DEMO]") ||
+                Boolean(roomData?.isDemo)) && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+                  DEMO BOOKING · SIMULATED PAYMENT · NO REAL MONEY CHARGED
+                </div>
+              )}
               <p className="text-xs text-[#5E6E65]">
                 Ref: <code>{paymentSession.paymentDetails.transactionRef}</code>
               </p>

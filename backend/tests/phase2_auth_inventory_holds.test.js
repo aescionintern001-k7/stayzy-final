@@ -5,6 +5,7 @@ import app from "../src/app.js";
 import pool from "../src/database/pool.js";
 import { googleLoginUser, resetPasswordWithToken } from "../src/modules/auth/auth.service.js";
 import { addCalendarDays } from "../src/utils/pricing.js";
+import { env } from "../src/config/env.js";
 
 let server;
 let baseUrl;
@@ -514,7 +515,7 @@ test("Unified Room Booking, Owner View, Extension & Tiered Cancel Refund", async
   const booking = bookBody.data.booking;
   createdBookingIds.push(booking.id);
   assert.ok(booking.booking_reference.startsWith("STY-"));
-  assert.ok(booking.keyless_code);
+  assert.equal(booking.keyless_code, null);
   assert.equal(booking.status, "pending");
 
   // Host aggregates reservations via /bookings/owner
@@ -545,14 +546,36 @@ test("Unified Room Booking, Owner View, Extension & Tiered Cancel Refund", async
   assert.equal(extBody.data.booking.duration_count, 3);
   assert.ok(extBody.data.extension.delta_total > 0);
 
-  // Simulate payment via demo-simulate so tiered cancel refund triggers (>48h = 100%)
-  const simRes = await fetch(`${baseUrl}/payments/demo-simulate`, {
+  // Complete payment via real create-order + HMAC verify so tiered cancel refund triggers (>48h = 100%)
+  const orderRes = await fetch(`${baseUrl}/payments/create-order`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${guestToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ booking_id: booking.id, outcome: "SUCCESS" }),
+    body: JSON.stringify({ booking_id: booking.id }),
+  });
+  const orderBody = await orderRes.json();
+  assert.equal(orderRes.status, 201);
+
+  const razorpayOrderId = orderBody.data.order.id;
+  const razorpayPaymentId = `pay_p2_cancel_${suffix}`;
+  const razorpaySignature = crypto
+    .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+    .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+    .digest("hex");
+
+  const simRes = await fetch(`${baseUrl}/payments/verify`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${guestToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      razorpay_order_id: razorpayOrderId,
+      razorpay_payment_id: razorpayPaymentId,
+      razorpay_signature: razorpaySignature,
+    }),
   });
   const simBody = await simRes.json();
   assert.equal(simRes.status, 200);
