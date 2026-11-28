@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const city = searchParams.get("city");
+    const locality = searchParams.get("locality");
     const minBudget = searchParams.get("minBudget") ? Number(searchParams.get("minBudget")) : undefined;
     const maxBudget = searchParams.get("maxBudget") ? Number(searchParams.get("maxBudget")) : undefined;
     const availableOnly = searchParams.get("availableOnly") === "true";
@@ -15,6 +16,9 @@ export async function GET(request: Request) {
     const backendQuery = new URLSearchParams();
     if (city && city !== "ALL" && city.trim() !== "") {
       backendQuery.set("city", city.trim());
+    }
+    if (locality && locality !== "ALL" && locality.trim() !== "") {
+      backendQuery.set("location", locality.trim());
     }
     if (minBudget !== undefined && minBudget > 0) {
       backendQuery.set("min_price", String(minBudget));

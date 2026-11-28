@@ -2,19 +2,71 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { getAuth, sendPasswordResetEmail } from "firebase/auth";
+import { app } from "@/lib/firebase";
 import { Footer } from "@/components/common/Footer";
-import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 export default function ForgotPasswordPage() {
   const toast = useToast();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    toast.info("Password Reset Sent", `If an account exists for ${email}, instructions were dispatched.`);
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const auth = getAuth(app);
+      await sendPasswordResetEmail(auth, trimmedEmail, {
+        url: `${window.location.origin}/login`,
+        handleCodeInApp: false,
+      });
+
+      setSubmitted(true);
+      toast.info(
+        "Password Reset Sent",
+        `If an account exists for ${trimmedEmail}, instructions were dispatched.`
+      );
+    } catch (err: any) {
+      const code = err?.code || "";
+      if (code === "auth/user-not-found") {
+        // Privacy-safe response: do not expose whether an account exists
+        setSubmitted(true);
+        toast.info(
+          "Password Reset Sent",
+          `If an account exists for ${trimmedEmail}, instructions were dispatched.`
+        );
+      } else if (code === "auth/invalid-email") {
+        const msg = "Please enter a valid email address.";
+        setError(msg);
+        toast.error("Invalid Email", msg);
+      } else if (code === "auth/too-many-requests") {
+        const msg = "Too many reset requests. Please wait a few minutes and try again.";
+        setError(msg);
+        toast.error("Rate Limited", msg);
+      } else if (code === "auth/network-request-failed") {
+        const msg = "Network error while contacting authentication service. Please try again.";
+        setError(msg);
+        toast.error("Network Error", msg);
+      } else {
+        const msg = "Unable to send password reset email right now. Please try again.";
+        setError(msg);
+        toast.error("Reset Failed", msg);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,10 +86,10 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <p className="text-xs text-[#192621] font-semibold">
-                If an account exists for <strong>{email}</strong>, password reset instructions have been sent.
+                If an account exists for <strong>{email.trim()}</strong>, password reset instructions have been sent.
               </p>
               <p className="text-[11px] text-[#7B8B82]">
-                In prototype mode, you can log in directly using the 1-click Demo buttons on the login page.
+                Check your inbox and spam folder for the password reset link.
               </p>
               <Link
                 href="/login"
@@ -48,6 +100,13 @@ export default function ForgotPasswordPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              {error && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <label className="font-bold text-[#5E6E65]">Email Address</label>
                 <div className="relative">
@@ -55,19 +114,21 @@ export default function ForgotPasswordPage() {
                   <input
                     type="email"
                     required
+                    disabled={loading}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full h-11 pl-9 pr-3 rounded-xl border border-[#D5D2C7] bg-[#FDFCF9] font-medium"
+                    className="w-full h-11 pl-9 pr-3 rounded-xl border border-[#D5D2C7] bg-[#FDFCF9] font-medium disabled:opacity-60"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full h-12 rounded-xl bg-[#123D2B] text-white font-bold text-xs hover:bg-[#0E2F21] transition-all cursor-pointer"
+                disabled={loading}
+                className="w-full h-12 rounded-xl bg-[#123D2B] text-white font-bold text-xs hover:bg-[#0E2F21] transition-all cursor-pointer disabled:opacity-60"
               >
-                Send Reset Link
+                {loading ? "Sending Reset Link..." : "Send Reset Link"}
               </button>
 
               <div className="pt-2 text-center">

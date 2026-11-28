@@ -203,6 +203,10 @@ function LoginForm() {
       const code = err?.code || "";
       if (code === "auth/popup-closed-by-user") {
         setError("Google sign-in popup was closed before completion.");
+      } else if (code === "auth/unauthorized-domain") {
+        setError(
+          "Google sign-in is not authorized for this domain yet. Add this domain in Firebase Console Authorized Domains or use Email/Password login."
+        );
       } else if (code === "auth/operation-not-allowed") {
         setError("Google sign-in is not yet enabled in Firebase Console. Please use Email or Phone login.");
       } else {
