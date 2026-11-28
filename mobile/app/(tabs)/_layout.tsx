@@ -1,168 +1,197 @@
 import React from "react";
-import { Tabs, Redirect } from "expo-router";
-import {
-  View,
-  Text,
-  Platform,
-  Pressable,
-  useWindowDimensions,
-  ActivityIndicator,
-} from "react-native";
+import { Tabs, Redirect, useRouter } from "expo-router";
+import { View, Text, Pressable, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Compass,
+  Search,
   Heart,
   CalendarDays,
-  Users,
   User,
-  FileText,
   Building2,
-  LayoutDashboard,
-  House,
+  ShieldCheck,
+  Leaf,
+  LogIn,
 } from "lucide-react-native";
 import { useRole } from "../../src/context/RoleContext";
+import { Colors } from "../../src/theme/colors";
 
-export default function Layout() {
-  const { role, setRole, firebaseUser, isGuest, loading, logout } = useRole();
-  const wide = useWindowDimensions().width >= 900;
+export default function TabsLayout() {
+  const router = useRouter();
+  const { role, user, isAuthenticated, isGuest, loading } = useRole();
 
-  if (loading) return <ActivityIndicator style={{ flex: 1, marginTop: 40 }} />;
-  if (!firebaseUser && !isGuest) return <Redirect href="/login" />;
+  if (loading) {
+    return (
+      <View style={styles.loaderWrap}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
-  const admin = role === "ADMIN";
-  const customer = role === "CUSTOMER";
-  const owner = role === "OWNER";
+  if (!isAuthenticated && !isGuest) {
+    return <Redirect href="/login" />;
+  }
+
+  const isAdmin = isAuthenticated && role === "ADMIN";
+  const isOwner = isAuthenticated && role === "OWNER";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-      {/* Top Header Bar */}
-      <View
-        style={{
-          height: 64,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: wide ? 44 : 16,
-          borderBottomWidth: 1,
-          borderColor: "#e6e5e3",
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <House color="#c5193e" size={26} />
-          <Text style={{ fontWeight: "900", fontSize: 24, letterSpacing: -1 }}>
-            Stay<Text style={{ color: "#c5193e" }}>zy</Text>
-          </Text>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      {/* Luxury Green & Ivory Top Bar */}
+      <View style={styles.header}>
+        <View style={styles.brandRow}>
+          <View style={styles.logoCircle}>
+            <Leaf size={17} color="#FFFFFF" />
+          </View>
+          <View>
+            <Text style={styles.brandTitle}>
+              Stay<Text style={styles.brandAccent}>zy</Text>
+            </Text>
+            <Text style={styles.brandSub}>Bengaluru Co-Living</Text>
+          </View>
         </View>
 
-        {/* Quick Role Switcher (Resident / Owner / Admin) */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setRole("CUSTOMER")}
-            style={{
-              paddingVertical: 5,
-              paddingHorizontal: 10,
-              borderRadius: 16,
-              backgroundColor: customer ? "#c5193e" : "#f1f1f1",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: customer ? "#ffffff" : "#555555",
-              }}
-            >
-              Resident
+        {isAuthenticated ? (
+          <View style={styles.rolePill}>
+            <Text style={styles.rolePillText}>
+              {isAdmin ? "ADMIN" : isOwner ? "PG HOST" : (user.name || "Stayzy").split(" ")[0]}
             </Text>
-          </Pressable>
+          </View>
+        ) : (
           <Pressable
-            accessibilityRole="button"
-            onPress={() => setRole("OWNER")}
-            style={{
-              paddingVertical: 5,
-              paddingHorizontal: 10,
-              borderRadius: 16,
-              backgroundColor: owner ? "#c5193e" : "#f1f1f1",
-            }}
+            style={styles.signInBtn}
+            onPress={() => router.push("/login")}
           >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: owner ? "#ffffff" : "#555555",
-              }}
-            >
-              PG Host
-            </Text>
+            <LogIn size={14} color="#FFFFFF" />
+            <Text style={styles.signInBtnText}>Sign In</Text>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setRole("ADMIN")}
-            style={{
-              paddingVertical: 5,
-              paddingHorizontal: 10,
-              borderRadius: 16,
-              backgroundColor: admin ? "#c5193e" : "#f1f1f1",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: admin ? "#ffffff" : "#555555",
-              }}
-            >
-              Admin
-            </Text>
-          </Pressable>
-        </View>
+        )}
       </View>
 
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarPosition: wide ? "left" : "bottom",
-          tabBarLabelPosition: wide ? "beside-icon" : "below-icon",
-          tabBarActiveTintColor: "#b51639",
-          tabBarInactiveTintColor: "#565659",
+          tabBarActiveTintColor: Colors.primary,
+          tabBarInactiveTintColor: Colors.textMuted,
           tabBarStyle: {
-            ...(wide ? { width: 185 } : { height: 64 }),
+            backgroundColor: Colors.card,
+            borderTopColor: Colors.border,
+            borderTopWidth: 1,
+            height: 62,
             paddingBottom: 8,
             paddingTop: 6,
           },
-          tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: "700",
+          },
         }}
       >
-        {(
-          [
-            [
-              "index",
-              customer ? "Explore" : admin ? "Operations" : "Properties",
-              customer ? Compass : admin ? LayoutDashboard : Building2,
-              true,
-            ],
-            ["saved", "Shortlist", Heart, customer],
-            ["stays", "Bookings", CalendarDays, true],
-            ["people", admin ? "People" : "Residents", Users, !customer],
-            ["content", "Content", FileText, admin],
-            ["profile", "Account", User, true],
-            ["search", "Search", Compass, false],
-          ] as const
-        ).map(([name, title, Icon, show]) => (
-          <Tabs.Screen
-            key={name}
-            name={name}
-            options={{
-              title,
-              href: show ? undefined : null,
-              tabBarIcon: ({ color }) => (
-                <Icon color={color} size={22} strokeWidth={1.7} />
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: isAdmin ? "Overview" : isOwner ? "Host Hub" : "Explore",
+            tabBarIcon: ({ color, size }) =>
+              isAdmin ? (
+                <ShieldCheck color={color} size={size} />
+              ) : isOwner ? (
+                <Building2 color={color} size={size} />
+              ) : (
+                <Compass color={color} size={size} />
               ),
-            }}
-          />
-        ))}
+          }}
+        />
+        <Tabs.Screen
+          name="search"
+          options={{
+            title: "Search",
+            tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="saved"
+          options={{
+            title: "Saved",
+            tabBarIcon: ({ color, size }) => <Heart color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="stays"
+          options={{
+            title: "My Stays",
+            tabBarIcon: ({ color, size }) => (
+              <CalendarDays color={color} size={size} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Account",
+            tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+          }}
+        />
+
+        {/* Hidden legacy tabs kept non-indexed in bar for backwards route safety */}
+        <Tabs.Screen name="content" options={{ href: null }} />
+        <Tabs.Screen name="people" options={{ href: null }} />
       </Tabs>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  loaderWrap: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  safeArea: { flex: 1, backgroundColor: Colors.background },
+  header: {
+    height: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    backgroundColor: Colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  logoCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: Colors.textMain,
+    letterSpacing: -0.5,
+  },
+  brandAccent: { color: Colors.secondary },
+  brandSub: { fontSize: 10, color: Colors.textMuted, fontWeight: "600" },
+  rolePill: {
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  rolePillText: { fontSize: 11, fontWeight: "800", color: Colors.primary },
+  signInBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+  },
+  signInBtnText: { fontSize: 12, fontWeight: "700", color: "#FFFFFF" },
+});

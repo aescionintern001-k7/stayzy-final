@@ -1,3 +1,6 @@
 import React from "react";
-import {LiveStays} from "../../src/screens/LiveStays";
-export default function Screen(){return <LiveStays savedOnly/>}
+import { CustomerSavedScreen } from "../../src/screens/customer/CustomerSavedScreen";
+
+export default function SavedTabScreen() {
+  return <CustomerSavedScreen />;
+}

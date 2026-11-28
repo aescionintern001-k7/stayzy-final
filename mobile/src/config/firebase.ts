@@ -15,20 +15,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export const mobileFirebaseConfig = {
   apiKey:
     process.env.EXPO_PUBLIC_FIREBASE_API_KEY ||
-    "AIzaSyAjUnuYLvCGfYJEqQ7unkYxAmWbDrwhy6E",
+    "AIzaSyAm-hx_KDHYrtEdEXm2l8oC8YrRhAkjqtA",
   authDomain:
     process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ||
-    "pg-rooms-60c83.firebaseapp.com",
+    "stayzy-2e171.firebaseapp.com",
   projectId:
-    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "pg-rooms-60c83",
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "stayzy-2e171",
   storageBucket:
     process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    "pg-rooms-60c83.firebasestorage.app",
+    "stayzy-2e171.firebasestorage.app",
   messagingSenderId:
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "27796929578",
+    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "54975315748",
   appId:
     process.env.EXPO_PUBLIC_FIREBASE_APP_ID ||
-    "1:27796929578:web:c9018be5ea6e29db88d753",
+    "1:54975315748:web:0f7531f49581af40effdb1",
 };
 
 // Initialize or reuse Firebase App instance

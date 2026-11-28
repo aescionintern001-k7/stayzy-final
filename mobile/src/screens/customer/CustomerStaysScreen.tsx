@@ -1,1037 +1,663 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Modal,
-  TextInput,
+  ActivityIndicator,
+  RefreshControl,
   Alert,
+  TextInput,
+  Modal,
 } from "react-native";
-import { Colors, Shadows } from "../../theme/colors";
-import { Header } from "../../components/Header";
-import { WhatsAppFAB } from "../../components/WhatsAppFAB";
+import { useRouter } from "expo-router";
+import {
+  BookingApi,
+  PaymentApi,
+  VisitSupportApi,
+} from "../../services/api";
 import { useRole } from "../../context/RoleContext";
+import { PendingBookingStorage } from "../../services/secureStorage";
+import {
+  classifyBookingFailure,
+  recoverPendingBookingByKey,
+} from "../../utils/bookingResilience";
+import { Colors, Shadows } from "../../theme/colors";
 import {
   KeyRound,
-  Wifi,
   Calendar,
   CreditCard,
-  Wrench,
-  Shield,
-  CheckCircle,
-  Copy,
-  Plus,
+  MessageSquarePlus,
+  RefreshCw,
   X,
-  FileText,
-  CheckCircle2,
-  Clock,
-  Sparkles,
 } from "lucide-react-native";
 
-export const CustomerStaysScreen: React.FC = () => {
-  const { user } = useRole();
-  const stay = user.activeStay;
+export function CustomerStaysScreen() {
+  const router = useRouter();
+  const { user, isAuthenticated } = useRole();
+  const payLockRef = useRef(false);
+  const [payingBookingId, setPayingBookingId] = useState<string | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
 
-  const [pinVisible, setPinVisible] = useState(false);
-  const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [tab, setTab] = useState<"BOOKINGS" | "PAYMENTS" | "VISITS" | "SUPPORT">(
+    "BOOKINGS"
+  );
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [refunds, setRefunds] = useState<any[]>([]);
+  const [visits, setVisits] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Extend Stay Modal
-  const [extendModalVisible, setExtendModalVisible] = useState(false);
-  const [extendMonths, setExtendMonths] = useState(1);
-  const [extendSuccess, setExtendSuccess] = useState(false);
+  // Support ticket modal
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [category, setCategory] = useState<
+    "general" | "maintenance" | "housekeeping" | "payment"
+  >("maintenance");
 
-  // Maintenance Ticket Modal
-  const [ticketModalVisible, setTicketModalVisible] = useState(false);
-  const [ticketCategory, setTicketCategory] = useState("Housekeeping");
-  const [ticketNotes, setTicketNotes] = useState("");
-  const [ticketSuccess, setTicketSuccess] = useState(false);
-  const [createdTicketId, setCreatedTicketId] = useState("");
+  const loadAll = useCallback(async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      setRefreshing(false);
+      setErrorMsg(null);
+      return;
+    }
+    setErrorMsg(null);
+    try {
+      if (user?.id) {
+        const pending = await PendingBookingStorage.getForUser(user.id);
+        if (pending) {
+          const rec = await recoverPendingBookingByKey({
+            idempotencyKey: pending.idempotencyKey,
+            deps: {
+              recoverByIdempotencyKey: BookingApi.recoverByIdempotencyKey,
+              clearPending: PendingBookingStorage.clear,
+            },
+          });
+          setRecoveryNotice(rec.state === "RECOVERING" ? rec.message || null : null);
+        } else {
+          setRecoveryNotice(null);
+        }
+      }
+      const [bRes, pRes, vRes, sRes] = await Promise.all([
+        BookingApi.getMyBookings(),
+        PaymentApi.getMyPayments(),
+        VisitSupportApi.getMyVisits(),
+        VisitSupportApi.getMySupportTickets(),
+      ]);
+      setBookings(bRes.bookings || []);
+      setSchedules(pRes.schedules || []);
+      setRefunds(pRes.refunds || []);
+      setVisits(vRes.visits || []);
+      setTickets(sRes.tickets || []);
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Unable to load your stays from the server.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [isAuthenticated]);
 
-  // Rent Receipt Modal
-  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
-  const handleCopy = (text: string, label: string) => {
-    setCopiedText(`${label} copied!`);
-    setTimeout(() => setCopiedText(null), 2500);
+  const handlePayNow = async (bookingId: string, scheduleId?: string) => {
+    if (payLockRef.current) return;
+    payLockRef.current = true;
+    setPayingBookingId(bookingId);
+    try {
+      const orderRes = await PaymentApi.createOrder({
+        booking_id: bookingId,
+        payment_schedule_id: scheduleId,
+        idempotency_key: `mob_${bookingId.slice(0, 12)}`,
+      });
+      if (__DEV__) {
+        await PaymentApi.demoSimulate({
+          booking_id: bookingId,
+          razorpay_order_id: orderRes.order.id,
+          payment_schedule_id: scheduleId,
+          outcome: "SUCCESS",
+        });
+        await PendingBookingStorage.clear();
+        Alert.alert("Payment Successful", "Transaction verified & synced.");
+        loadAll();
+      } else {
+        Alert.alert(
+          "Order Ready",
+          `Razorpay Order ${orderRes.order.id} created. Complete via checkout.`
+        );
+      }
+    } catch (err: any) {
+      const classified = classifyBookingFailure(err);
+      if (classified.kind === "UNCERTAIN") {
+        try {
+          const rec = await PaymentApi.reconcile({ booking_id: bookingId });
+          if (rec.reconciled && rec.booking?.payment_status === "paid") {
+            await PendingBookingStorage.clear();
+            Alert.alert("Payment Verified", "Your payment was confirmed.");
+            loadAll();
+            return;
+          }
+        } catch {
+          // Ignore reconcile error and show safe uncertain message
+        }
+        Alert.alert(
+          "Payment Status Uncertain",
+          "We're checking your payment status. Refresh My Stays before retrying."
+        );
+        loadAll();
+      } else {
+        Alert.alert("Payment Failed", err?.message || "Could not process payment");
+      }
+    } finally {
+      payLockRef.current = false;
+      setPayingBookingId(null);
+    }
   };
 
-  const handleConfirmExtend = () => {
-    setExtendModalVisible(false);
-    setExtendSuccess(true);
+  const handleExtend = async (bookingId: string) => {
+    try {
+      const res = await BookingApi.extendBooking(bookingId, 1);
+      Alert.alert(
+        "Stay Extended",
+        `Extended through ${res.extension.new_check_out_date} (+₹${res.extension.delta_total})`
+      );
+      loadAll();
+    } catch (err: any) {
+      Alert.alert("Cannot Extend", err?.message || "Unit conflict on extension");
+    }
   };
 
-  const handleConfirmTicket = () => {
-    const id = "TKT-" + Math.floor(1000 + Math.random() * 9000);
-    setCreatedTicketId(id);
-    setTicketModalVisible(false);
-    setTicketSuccess(true);
-    setTicketNotes("");
+  const handleCancel = (bookingId: string) => {
+    Alert.alert(
+      "Cancel Booking",
+      "Refund is calculated automatically (>48h 100%, 24-48h 50% base + deposit, <24h deposit only).",
+      [
+        { text: "Keep Stay", style: "cancel" },
+        {
+          text: "Confirm Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await BookingApi.cancelBooking(bookingId);
+              const refundAmt = res.booking?.refund?.amount || 0;
+              Alert.alert(
+                "Booking Cancelled",
+                refundAmt > 0
+                  ? `Refund initiated: ₹${refundAmt.toLocaleString("en-IN")}`
+                  : "Reservation cancelled."
+              );
+              loadAll();
+            } catch (err: any) {
+              Alert.alert("Error", err?.message || "Could not cancel");
+            }
+          },
+        },
+      ]
+    );
   };
 
-  if (!stay) {
+  const handleCreateTicket = async () => {
+    if (!subject.trim() || !message.trim()) return;
+    try {
+      await VisitSupportApi.createSupportTicket({
+        category,
+        subject: subject.trim(),
+        message: message.trim(),
+      });
+      setTicketOpen(false);
+      setSubject("");
+      setMessage("");
+      loadAll();
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Could not submit ticket");
+    }
+  };
+
+  if (!isAuthenticated) {
     return (
-      <View style={styles.emptyContainer}>
-        <KeyRound size={40} color={Colors.textMuted} />
-        <Text style={styles.emptyTitle}>No Active Stay Yet</Text>
-        <Text style={styles.emptySubtitle}>
-          Reserve a PG accommodation from the Explore tab to activate your digital door PIN & Wi-Fi access.
+      <View style={styles.centerCard}>
+        <Text style={styles.emptyTitle}>Sign in to view your Stays</Text>
+        <Text style={styles.emptySub}>
+          Access keyless room PINs, rent schedules, walkthrough tours & support.
         </Text>
+        <TouchableOpacity
+          style={styles.ctaBtn}
+          onPress={() => router.push("/login")}
+        >
+          <Text style={styles.ctaBtnText}>Sign In</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-      <Header />
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: 90 }}
-        showsVerticalScrollIndicator={false}
-      >
-      {/* Header */}
-      <View style={styles.headerArea}>
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.pageTitle}>Resident Access Pass</Text>
-          <View style={styles.activeTag}>
-            <View style={styles.greenDot} />
-            <Text style={styles.activeTagText}>CHECKED IN</Text>
-          </View>
-        </View>
-        <Text style={styles.pageSubtitle}>
-          Keyless smart door access, 300 Mbps Wi-Fi, and rent ledger
-        </Text>
-      </View>
-
-      {/* Copy Toast feedback */}
-      {copiedText && (
-        <View style={styles.toastBox}>
-          <CheckCircle2 size={14} color="#ffffff" />
-          <Text style={styles.toastText}>{copiedText}</Text>
-        </View>
-      )}
-
-      {/* Main Stay Pass Card */}
-      <View style={styles.passCard}>
-        <View style={styles.passHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.passProperty}>{stay.propertyName}</Text>
-            <Text style={styles.passRoom}>{stay.roomName}</Text>
-          </View>
-          <View style={styles.residentBadge}>
-            <Sparkles size={12} color="#ffffff" />
-            <Text style={styles.residentBadgeText}>RESIDENT</Text>
-          </View>
-        </View>
-
-        {/* 1. Digital Smart Door Lock PIN Box */}
-        <View style={styles.pinCard}>
-          <View style={styles.pinIconRow}>
-            <KeyRound size={18} color={Colors.forest} />
-            <Text style={styles.pinLabel}>Keyless Smart Door Lock PIN</Text>
-          </View>
-          <View style={styles.pinDisplayRow}>
-            <TouchableOpacity
-              style={styles.pinBox}
-              onPress={() => setPinVisible(!pinVisible)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.pinCodeText}>
-                {pinVisible ? stay.roomPin : "•••• #"}
-              </Text>
-              <Text style={styles.pinToggleText}>
-                {pinVisible ? "Hide PIN" : "Tap to Reveal"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.copyBtn}
-              onPress={() => handleCopy(stay.roomPin, "PIN")}
-              activeOpacity={0.8}
-            >
-              <Copy size={16} color={Colors.forest} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 2. Wi-Fi Credentials Box */}
-        <View style={styles.credentialCard}>
-          <View style={styles.credRow}>
-            <Wifi size={16} color={Colors.forest} />
-            <Text style={styles.credTitle}>High-Speed 300 Mbps Wi-Fi</Text>
-          </View>
-          <View style={styles.credValues}>
-            <TouchableOpacity
-              style={styles.credLineRow}
-              onPress={() => handleCopy(stay.wifiName, "Wi-Fi SSID")}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.credLine}>
-                SSID: <Text style={styles.credBold}>{stay.wifiName}</Text>
-              </Text>
-              <Copy size={13} color={Colors.textMuted} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.credLineRow}
-              onPress={() => handleCopy(stay.wifiPass, "Wi-Fi Password")}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.credLine}>
-                Password: <Text style={styles.credBold}>{stay.wifiPass}</Text>
-              </Text>
-              <Copy size={13} color={Colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 3. Schedule & Rent Details */}
-        <View style={styles.scheduleGrid}>
-          <View style={styles.gridItem}>
-            <Text style={styles.gridLabel}>Stay Validity</Text>
-            <Text style={styles.gridValue}>{stay.checkOutDate}</Text>
-          </View>
-
-          <View style={styles.gridItem}>
-            <Text style={styles.gridLabel}>Monthly Rent</Text>
-            <Text style={styles.gridValue}>
-              ₹{stay.rentAmount.toLocaleString("en-IN")}
-            </Text>
-          </View>
-        </View>
-
-        {/* Rent Status & Receipt Row */}
-        <View style={styles.rentStatusRow}>
-          <View style={styles.rentLeft}>
-            <Text style={styles.rentStatusLabel}>Rent Status:</Text>
-            <View
-              style={[
-                styles.rentStatusPill,
-                stay.rentStatus === "PAID"
-                  ? styles.rentStatusPaid
-                  : styles.rentStatusDue,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.rentStatusPillText,
-                  stay.rentStatus === "PAID"
-                    ? styles.rentStatusPaidText
-                    : styles.rentStatusDueText,
-                ]}
-              >
-                ✓ {stay.rentStatus}
-              </Text>
-            </View>
-          </View>
-
+    <View style={styles.container}>
+      <View style={styles.tabRow}>
+        {(["BOOKINGS", "PAYMENTS", "VISITS", "SUPPORT"] as const).map((t) => (
           <TouchableOpacity
-            style={styles.receiptBtn}
-            onPress={() => setReceiptModalVisible(true)}
-            activeOpacity={0.8}
+            key={t}
+            style={[styles.tabPill, tab === t && styles.tabPillActive]}
+            onPress={() => setTab(t)}
           >
-            <FileText size={13} color={Colors.forest} />
-            <Text style={styles.receiptBtnText}>View Receipt</Text>
+            <Text
+              style={[styles.tabText, tab === t && { color: "#FFFFFF" }]}
+            >
+              {t.charAt(0) + t.slice(1).toLowerCase()}
+            </Text>
           </TouchableOpacity>
-        </View>
+        ))}
       </View>
 
-      {/* Action Hub */}
-      <Text style={styles.hubTitle}>Resident Services</Text>
-
-      <View style={styles.actionGrid}>
-        {/* Extend Stay Card */}
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => setExtendModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.actionIconCircle}>
-            <Calendar size={18} color={Colors.forest} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionCardTitle}>Extend Stay</Text>
-            <Text style={styles.actionCardSub}>
-              Add months or transition to annual plan
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Maintenance Request Card */}
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => setTicketModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.actionIconCircle}>
-            <Wrench size={18} color={Colors.forest} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionCardTitle}>Raise Ticket</Text>
-            <Text style={styles.actionCardSub}>
-              Housekeeping, Wi-Fi, plumbing, electrical
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Safety & Gate Pass Note */}
-      <View style={styles.safetyBox}>
-        <Shield size={16} color={Colors.forest} />
-        <Text style={styles.safetyText}>
-          Your building features 24/7 CCTV surveillance, biometric visitor screening, and emergency power backup.
-        </Text>
-      </View>
-
-      {/* Extend Stay Modal */}
-      <Modal
-        visible={extendModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setExtendModalVisible(false)}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadAll();
+            }}
+            tintColor={Colors.primary}
+          />
+        }
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Request Stay Extension</Text>
-              <TouchableOpacity onPress={() => setExtendModalVisible(false)}>
-                <X size={20} color={Colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalDesc}>
-              Extend your tenure at {stay.propertyName}. Your existing keyless PIN and room assignment will remain unchanged.
+        {recoveryNotice && (
+          <View
+            style={[
+              styles.errorBox,
+              { backgroundColor: "#EAF5E5", borderColor: "#E6DFD1", borderWidth: 1 },
+            ]}
+          >
+            <Text style={[styles.errorText, { color: "#064B35" }]}>
+              {recoveryNotice}
             </Text>
-
-            <Text style={styles.fieldLabel}>Select Extension Duration:</Text>
-            <View style={styles.monthsRow}>
-              {[1, 2, 3, 6].map((m) => (
-                <TouchableOpacity
-                  key={m}
-                  style={[
-                    styles.monthPill,
-                    extendMonths === m && styles.monthPillSelected,
-                  ]}
-                  onPress={() => setExtendMonths(m)}
-                >
-                  <Text
-                    style={[
-                      styles.monthText,
-                      extendMonths === m && styles.monthTextSelected,
-                    ]}
-                  >
-                    +{m} {m === 1 ? "Month" : "Months"}
+          </View>
+        )}
+        {errorMsg && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        )}
+        {loading ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+        ) : tab === "BOOKINGS" ? (
+          bookings.length === 0 ? (
+            <Text style={styles.emptySub}>No bookings yet.</Text>
+          ) : (
+            bookings.map((b) => (
+              <View key={b.id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <Text style={styles.refText}>
+                    {b.booking_reference || b.id.slice(0, 8)}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  <View style={styles.statusPill}>
+                    <Text style={styles.statusText}>
+                      {String(b.status).toUpperCase()} ·{" "}
+                      {String(b.payment_status).toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
 
-            <View style={styles.extendSummaryCard}>
-              <Text style={styles.extendSummaryLabel}>New Check-out Date:</Text>
-              <Text style={styles.extendSummaryValue}>
-                31 Dec 2026 (Extended by {extendMonths} month)
-              </Text>
-              <Text style={styles.extendSummaryRent}>
-                Rent rate locked at ₹{stay.rentAmount.toLocaleString("en-IN")}/mo
-              </Text>
-            </View>
+                <Text style={styles.propTitle}>
+                  {b.property?.title || "Stayzy Residence"}
+                </Text>
+                <Text style={styles.metaText}>
+                  {b.room_type?.name || "Room"} · {b.check_in_date} →{" "}
+                  {b.check_out_date}
+                </Text>
+                <Text style={styles.priceText}>
+                  Total ₹{Number(b.total_price).toLocaleString("en-IN")}
+                </Text>
 
-            <TouchableOpacity
-              style={styles.modalSubmitBtn}
-              onPress={handleConfirmExtend}
-            >
-              <Text style={styles.modalSubmitText}>Submit Extension Request</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+                {b.keyless_code &&
+                  ["confirmed", "checked_in"].includes(b.status) &&
+                  b.payment_status === "paid" && (
+                    <View style={styles.pinBox}>
+                      <KeyRound size={15} color={Colors.primary} />
+                      <Text style={styles.pinText}>
+                        Keyless Access PIN: {b.keyless_code}
+                      </Text>
+                    </View>
+                  )}
 
-      {/* Extend Success Modal */}
-      <Modal visible={extendSuccess} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.dialogCard}>
-            <CheckCircle2 size={36} color={Colors.forest} />
-            <Text style={styles.dialogTitle}>Extension Requested!</Text>
-            <Text style={styles.dialogText}>
-              Host Rajesh Sharma has been notified. We will update your checkout date upon confirmation.
-            </Text>
-            <TouchableOpacity
-              style={styles.dialogDoneBtn}
-              onPress={() => setExtendSuccess(false)}
-            >
-              <Text style={styles.dialogDoneText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Maintenance Ticket Modal */}
-      <Modal
-        visible={ticketModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setTicketModalVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Maintenance Ticket</Text>
-              <TouchableOpacity onPress={() => setTicketModalVisible(false)}>
-                <X size={20} color={Colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.fieldLabel}>Select Issue Category:</Text>
-            <View style={styles.catGrid}>
-              {[
-                "Housekeeping",
-                "Wi-Fi / Fiber",
-                "Plumbing",
-                "Air Conditioning",
-                "Electrical",
-              ].map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.catPill,
-                    ticketCategory === c && styles.catPillSelected,
-                  ]}
-                  onPress={() => setTicketCategory(c)}
-                >
-                  <Text
-                    style={[
-                      styles.catText,
-                      ticketCategory === c && styles.catTextSelected,
-                    ]}
-                  >
-                    {c}
+                <View style={styles.actionRow}>
+                  {b.payment_status !== "paid" && b.status !== "cancelled" && (
+                    <TouchableOpacity
+                      style={[
+                        styles.smallPrimary,
+                        payingBookingId === b.id && { opacity: 0.65 },
+                      ]}
+                      onPress={() => handlePayNow(b.id)}
+                      disabled={payingBookingId === b.id}
+                    >
+                      <CreditCard size={13} color="#FFFFFF" />
+                      <Text style={styles.smallPrimaryText}>
+                        {payingBookingId === b.id ? "Processing..." : "Pay Now"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {["pending", "confirmed", "checked_in"].includes(b.status) && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.smallOutline}
+                        onPress={() => handleExtend(b.id)}
+                      >
+                        <RefreshCw size={13} color={Colors.primary} />
+                        <Text style={styles.smallOutlineText}>+1 Extend</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.smallOutline,
+                          { borderColor: Colors.accentRed },
+                        ]}
+                        onPress={() => handleCancel(b.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.smallOutlineText,
+                            { color: Colors.accentRed },
+                          ]}
+                        >
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+            ))
+          )
+        ) : tab === "PAYMENTS" ? (
+          <>
+            <Text style={styles.subHeader}>Upcoming Installments</Text>
+            {schedules.length === 0 ? (
+              <Text style={styles.emptySub}>No scheduled installments.</Text>
+            ) : (
+              schedules.map((s) => (
+                <View key={s.id} style={styles.card}>
+                  <Text style={styles.propTitle}>{s.description}</Text>
+                  <Text style={styles.metaText}>
+                    Due: {String(s.due_date).split("T")[0]} · Status: {s.status}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.fieldLabel}>Describe Issue (Optional):</Text>
-            <TextInput
-              placeholder="e.g. Washroom tap drippage, need room cleaning..."
-              placeholderTextColor={Colors.textMuted}
-              value={ticketNotes}
-              onChangeText={setTicketNotes}
-              style={styles.ticketInput}
-              multiline
-              numberOfLines={3}
-            />
-
+                  <View style={styles.cardTop}>
+                    <Text style={styles.priceText}>
+                      ₹{Number(s.amount).toLocaleString("en-IN")}
+                    </Text>
+                    {s.status === "PENDING" && (
+                      <TouchableOpacity
+                        style={styles.smallPrimary}
+                        onPress={() => handlePayNow(s.booking_id, s.id)}
+                      >
+                        <Text style={styles.smallPrimaryText}>Pay Installment</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))
+            )}
+            {refunds.length > 0 && (
+              <>
+                <Text style={[styles.subHeader, { marginTop: 12 }]}>Refunds</Text>
+                {refunds.map((r) => (
+                  <View key={r.id} style={styles.card}>
+                    <Text style={styles.propTitle}>
+                      ₹{Number(r.amount).toLocaleString("en-IN")} · {r.status}
+                    </Text>
+                    <Text style={styles.metaText}>{r.reason}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </>
+        ) : tab === "VISITS" ? (
+          visits.length === 0 ? (
+            <Text style={styles.emptySub}>No walkthrough visits scheduled.</Text>
+          ) : (
+            visits.map((v) => (
+              <View key={v.id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <Text style={styles.propTitle}>{v.property_title}</Text>
+                  <View style={styles.statusPill}>
+                    <Text style={styles.statusText}>
+                      {String(v.status).toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.metaText}>
+                  <Calendar size={12} color={Colors.primary} />{" "}
+                  {String(v.preferred_date).split("T")[0]} at {v.time_slot}
+                </Text>
+              </View>
+            ))
+          )
+        ) : (
+          <>
             <TouchableOpacity
-              style={styles.modalSubmitBtn}
-              onPress={handleConfirmTicket}
+              style={[styles.ctaBtn, { marginBottom: 14, alignSelf: "stretch" }]}
+              onPress={() => setTicketOpen(true)}
             >
-              <Text style={styles.modalSubmitText}>Submit Ticket</Text>
+              <MessageSquarePlus size={16} color="#FFFFFF" />
+              <Text style={styles.ctaBtnText}>Raise New Support Ticket</Text>
             </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Ticket Success Modal */}
-      <Modal visible={ticketSuccess} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.dialogCard}>
-            <CheckCircle2 size={36} color={Colors.forest} />
-            <Text style={styles.dialogTitle}>Ticket #{createdTicketId} Logged</Text>
-            <Text style={styles.dialogText}>
-              Your maintenance request for {ticketCategory} has been dispatched to property staff. Expected resolution within 4 hours.
-            </Text>
-            <TouchableOpacity
-              style={styles.dialogDoneBtn}
-              onPress={() => setTicketSuccess(false)}
-            >
-              <Text style={styles.dialogDoneText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Rent Receipt Modal */}
-      <Modal
-        visible={receiptModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setReceiptModalVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.dialogCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Rent Receipt — Oct 2026</Text>
-              <TouchableOpacity onPress={() => setReceiptModalVisible(false)}>
-                <X size={18} color={Colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.receiptBox}>
-              <Text style={styles.receiptLine}>
-                Receipt No: <Text style={styles.receiptBold}>REC-2026-8921</Text>
-              </Text>
-              <Text style={styles.receiptLine}>
-                Resident: <Text style={styles.receiptBold}>{user.name}</Text>
-              </Text>
-              <Text style={styles.receiptLine}>
-                Property: <Text style={styles.receiptBold}>{stay.propertyName}</Text>
-              </Text>
-              <Text style={styles.receiptLine}>
-                Room: <Text style={styles.receiptBold}>{stay.roomName}</Text>
-              </Text>
-              <Text style={styles.receiptLine}>
-                Amount Paid: <Text style={styles.receiptBold}>₹{stay.rentAmount.toLocaleString("en-IN")}</Text>
-              </Text>
-              <Text style={styles.receiptLine}>
-                Payment Mode: <Text style={styles.receiptBold}>UPI / Auto-Debit</Text>
-              </Text>
-              <Text style={styles.receiptLine}>
-                Status: <Text style={[styles.receiptBold, { color: Colors.forest }]}>PAID & VERIFIED</Text>
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.dialogDoneBtn}
-              onPress={() => setReceiptModalVisible(false)}
-            >
-              <Text style={styles.dialogDoneText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+            {tickets.map((t) => (
+              <View key={t.id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <Text style={styles.propTitle}>{t.subject}</Text>
+                  <View style={styles.statusPill}>
+                    <Text style={styles.statusText}>
+                      {String(t.status).toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.metaText}>{t.message}</Text>
+                {t.admin_reply && (
+                  <View style={styles.pinBox}>
+                    <Text style={styles.pinText}>Reply: {t.admin_reply}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </>
+        )}
       </ScrollView>
-      <WhatsAppFAB />
+
+      <Modal visible={ticketOpen} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.cardTop}>
+              <Text style={styles.propTitle}>New Support Request</Text>
+              <TouchableOpacity onPress={() => setTicketOpen(false)}>
+                <X size={20} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: "row", gap: 6, marginVertical: 10 }}>
+              {(["maintenance", "housekeeping", "payment", "general"] as const).map(
+                (c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[
+                      styles.smallOutline,
+                      category === c && { backgroundColor: Colors.primaryLight },
+                    ]}
+                    onPress={() => setCategory(c)}
+                  >
+                    <Text style={styles.smallOutlineText}>{c}</Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Subject"
+              value={subject}
+              onChangeText={setSubject}
+            />
+            <TextInput
+              style={[styles.input, { height: 90, textAlignVertical: "top", paddingTop: 10 }]}
+              placeholder="Describe the issue..."
+              multiline
+              value={message}
+              onChangeText={setMessage}
+            />
+            <TouchableOpacity style={styles.ctaBtn} onPress={handleCreateTicket}>
+              <Text style={styles.ctaBtnText}>Submit Ticket</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    padding: 16,
-  },
-  headerArea: {
-    marginBottom: 14,
-  },
-  headerTitleRow: {
+  container: { flex: 1, backgroundColor: Colors.background },
+  tabRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  pageTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: Colors.textMain,
-    letterSpacing: -0.5,
-  },
-  pageSubtitle: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  activeTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.primaryBorder,
-  },
-  greenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.forest,
-  },
-  activeTagText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: Colors.forest,
-  },
-  toastBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.forest,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
     gap: 6,
-    marginBottom: 10,
-    alignSelf: "center",
+    padding: 12,
+    backgroundColor: Colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  toastText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
+  tabPill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: Colors.cardWarm,
+    alignItems: "center",
   },
-  passCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
+  tabPillActive: { backgroundColor: Colors.primary },
+  tabText: { fontSize: 12, fontWeight: "800", color: Colors.textSub },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  card: {
+    backgroundColor: Colors.card,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 16,
+    marginBottom: 12,
     ...Shadows.card,
   },
-  passHeader: {
+  cardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
+    alignItems: "center",
+    marginBottom: 6,
   },
-  passProperty: {
+  refText: { fontSize: 11, fontWeight: "800", color: Colors.textMuted },
+  statusPill: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  statusText: { fontSize: 10, fontWeight: "800", color: Colors.primary },
+  propTitle: { fontSize: 15, fontWeight: "800", color: Colors.textMain },
+  metaText: { fontSize: 12, color: Colors.textMuted, marginTop: 3 },
+  priceText: {
     fontSize: 16,
     fontWeight: "900",
-    color: Colors.textMain,
-  },
-  passRoom: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  residentBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.forest,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 5,
-    gap: 3,
-  },
-  residentBadgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: "#ffffff",
-  },
-  pinCard: {
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: Colors.primaryBorder,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  pinIconRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-  },
-  pinLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: Colors.forest,
-  },
-  pinDisplayRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    color: Colors.primary,
+    marginTop: 6,
   },
   pinBox: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: Colors.primaryBorder,
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.primaryLight,
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 10,
   },
-  pinCodeText: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: Colors.forest,
-    letterSpacing: 2,
+  pinText: { fontSize: 12, fontWeight: "800", color: Colors.primary, flex: 1 },
+  actionRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
+  smallPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
-  pinToggleText: {
-    fontSize: 11,
-    color: Colors.forest,
-    fontWeight: "700",
-  },
-  copyBtn: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#ffffff",
-    borderRadius: 6,
+  smallPrimaryText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  smallOutline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     borderWidth: 1,
     borderColor: Colors.primaryBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  smallOutlineText: { color: Colors.primary, fontSize: 11, fontWeight: "800" },
+  centerCard: {
+    flex: 1,
+    backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
+    padding: 28,
   },
-  credentialCard: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  credRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
-  },
-  credTitle: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: Colors.textMain,
-  },
-  credValues: {
-    gap: 4,
-  },
-  credLineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 2,
-  },
-  credLine: {
-    fontSize: 11,
-    color: Colors.textSub,
-  },
-  credBold: {
-    fontWeight: "800",
-    color: Colors.textMain,
-  },
-  scheduleGrid: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    paddingTop: 10,
-    marginBottom: 10,
-  },
-  gridItem: {
-    flex: 1,
-  },
-  gridLabel: {
-    fontSize: 10,
-    color: Colors.textMuted,
-    fontWeight: "600",
-  },
-  gridValue: {
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: Colors.textMain },
+  emptySub: {
     fontSize: 13,
-    fontWeight: "800",
-    color: Colors.textMain,
-    marginTop: 2,
-  },
-  rentStatusRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    paddingTop: 10,
-  },
-  rentLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  rentStatusLabel: {
-    fontSize: 11,
     color: Colors.textMuted,
-    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 6,
   },
-  rentStatusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  rentStatusPaid: {
-    backgroundColor: Colors.primaryLight,
-  },
-  rentStatusDue: {
-    backgroundColor: "#FEE2E2",
-  },
-  rentStatusPillText: {
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  rentStatusPaidText: {
-    color: Colors.forest,
-  },
-  rentStatusDueText: {
-    color: Colors.accentRed,
-  },
-  receiptBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  receiptBtnText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: Colors.forest,
-    textDecorationLine: "underline",
-  },
-  hubTitle: {
-    fontSize: 14,
+  subHeader: {
+    fontSize: 15,
     fontWeight: "800",
     color: Colors.textMain,
     marginBottom: 8,
   },
-  actionGrid: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  actionCard: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    padding: 12,
+  ctaBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-  },
-  actionIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    backgroundColor: Colors.primaryLight,
-    alignItems: "center",
     justifyContent: "center",
-  },
-  actionCardTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: Colors.textMain,
-  },
-  actionCardSub: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 1,
-  },
-  safetyBox: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 8,
-    backgroundColor: Colors.primaryLight,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 30,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 22,
+    height: 46,
+    borderRadius: 14,
+    marginTop: 16,
   },
-  safetyText: {
-    fontSize: 11,
-    color: Colors.forest,
-    fontWeight: "600",
-    flex: 1,
-    lineHeight: 16,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 30,
-    marginTop: 60,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: Colors.textMain,
-    marginTop: 12,
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: "center",
-    marginTop: 4,
-    lineHeight: 18,
-  },
+  ctaBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(13,43,34,0.45)",
     justifyContent: "flex-end",
   },
-  modalSheet: {
-    backgroundColor: "#ffffff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  modalCard: {
+    backgroundColor: Colors.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 20,
-    maxHeight: "85%",
+    paddingBottom: 34,
   },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: Colors.textMain,
-  },
-  modalDesc: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    lineHeight: 16,
-    marginBottom: 14,
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: Colors.textMain,
-    marginBottom: 6,
-  },
-  monthsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 14,
-  },
-  monthPill: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-  },
-  monthPillSelected: {
-    backgroundColor: Colors.forest,
-    borderColor: Colors.forest,
-  },
-  monthText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: Colors.textMuted,
-  },
-  monthTextSelected: {
-    color: "#ffffff",
-  },
-  extendSummaryCard: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  extendSummaryLabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  extendSummaryValue: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: Colors.textMain,
-    marginTop: 2,
-  },
-  extendSummaryRent: {
-    fontSize: 11,
-    color: Colors.forest,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  modalSubmitBtn: {
-    backgroundColor: Colors.forest,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  modalSubmitText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  catGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginBottom: 14,
-  },
-  catPill: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: "#ffffff",
-  },
-  catPillSelected: {
-    backgroundColor: Colors.forest,
-    borderColor: Colors.forest,
-  },
-  catText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: Colors.textMuted,
-  },
-  catTextSelected: {
-    color: "#ffffff",
-  },
-  ticketInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    padding: 10,
-    fontSize: 12,
-    color: Colors.textMain,
-    textAlignVertical: "top",
-    backgroundColor: Colors.background,
-    marginBottom: 16,
-  },
-  dialogCard: {
-    backgroundColor: "#ffffff",
+  input: {
+    height: 44,
     borderRadius: 12,
-    padding: 20,
-    margin: 20,
-    alignItems: "center",
-    alignSelf: "center",
-    maxWidth: 360,
-    width: "100%",
-  },
-  dialogTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: Colors.textMain,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  dialogText: {
-    fontSize: 12,
-    color: Colors.textSub,
-    textAlign: "center",
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  dialogDoneBtn: {
-    backgroundColor: Colors.forest,
-    paddingVertical: 10,
-    borderRadius: 6,
-    width: "100%",
-    alignItems: "center",
-  },
-  dialogDoneText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  receiptBox: {
-    width: "100%",
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.cardWarm,
     borderWidth: 1,
     borderColor: Colors.border,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    fontSize: 14,
+  },
+  errorBox: {
+    backgroundColor: Colors.accentRedLight,
     padding: 12,
-    borderRadius: 6,
-    gap: 4,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 12,
   },
-  receiptLine: {
-    fontSize: 12,
-    color: Colors.textSub,
-  },
-  receiptBold: {
-    fontWeight: "800",
-    color: Colors.textMain,
-  },
+  errorText: { fontSize: 12, fontWeight: "700", color: Colors.accentRed },
 });

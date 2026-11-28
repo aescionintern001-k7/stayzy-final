@@ -38,7 +38,7 @@ export default function Directory() {
     [busy, setBusy] = useState(false);
   const [original,setOriginal]=useState<Row|null>(null);
   const [feedback,report]=useState("");
-  const uid = firebaseUser?.uid;
+  const uid = firebaseUser?.id;
   useEffect(() => {
     setRows([]);
     setEdit(null);

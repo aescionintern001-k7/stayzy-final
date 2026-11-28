@@ -47,7 +47,7 @@ export function LiveStays({
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const { role, firebaseUser, favorites, toggleFavorite } = useRole(),
-    uid = firebaseUser?.uid;
+    uid = firebaseUser?.id;
   const [tickets, setTickets] = useState<DocumentData[]>([]);
   const [properties, props] = useState<DocumentData[]>([]),
     [records, bookings] = useState<DocumentData[]>([]),
