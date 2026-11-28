@@ -164,6 +164,7 @@ export const listRoomsService = async (query = {}) => {
       SELECT
         rt.*,
         p.id AS property_id,
+        p.is_demo AS property_is_demo,
         p.title AS property_title,
         p.description AS property_description,
         p.address AS property_address,
@@ -311,6 +312,7 @@ export const listRoomsService = async (query = {}) => {
         genderPolicy: row.property_gender_policy || "COLIVING",
         averageRating: Number.parseFloat(row.property_rating || 0),
         reviewsCount: Number.parseInt(row.property_reviews_count || 0, 10),
+        is_demo: row.property_is_demo === true,
       },
       currentRatePlan: activeRatePlan,
       allRatePlans: ratePlans,
@@ -318,6 +320,7 @@ export const listRoomsService = async (query = {}) => {
       available_count: availableCount,
       availableCount,
       isAvailable: availableCount > 0,
+      isDemo: row.property_is_demo === true,
       created_at: row.created_at,
     };
   });
@@ -375,6 +378,7 @@ export const getRoomDetailService = async (slugOrId, query = {}) => {
       SELECT
         rt.*,
         p.id AS property_id,
+        p.is_demo AS property_is_demo,
         p.title AS property_title,
         p.description AS property_description,
         p.address AS property_address,
@@ -517,6 +521,7 @@ export const getRoomDetailService = async (slugOrId, query = {}) => {
         genderPolicy: row.property_gender_policy || "COLIVING",
         averageRating: Number.parseFloat(row.property_rating || 0),
         reviewsCount: Number.parseInt(row.property_reviews_count || 0, 10),
+        is_demo: row.property_is_demo === true,
       },
       allRatePlans: ratePlans,
       currentRatePlan: activePlan,
@@ -525,6 +530,7 @@ export const getRoomDetailService = async (slugOrId, query = {}) => {
       available_count: availableUnits.length,
       availableCount: availableUnits.length,
       isAvailable: availableUnits.length > 0,
+      isDemo: row.property_is_demo === true,
       reviews: reviewsRes.rows,
     },
   };

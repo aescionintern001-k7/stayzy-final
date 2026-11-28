@@ -144,12 +144,14 @@ app.use(`${env.API_PREFIX}/content`, searchRateLimiter, publicCatalogCache, cmsR
 app.use(`${env.API_PREFIX}/reviews`, reviewRoutes);
 app.use(`${env.API_PREFIX}/admin`, noStorePrivate, adminRoutes);
 
-// API Documentation (Swagger UI)
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiDocument));
-app.get("/api/docs/spec.json", (req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  res.json(openapiDocument);
-});
+// API Documentation (Swagger UI — disabled in live production)
+if (!(env.NODE_ENV === "production" && env.APP_ENV === "production")) {
+  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiDocument));
+  app.get("/api/docs/spec.json", (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.json(openapiDocument);
+  });
+}
 
 // API root
 app.get(env.API_PREFIX, (req, res) => {

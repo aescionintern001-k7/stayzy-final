@@ -128,6 +128,7 @@ export function backendPropertyToFrontendRoom(property: BackendProperty) {
     averageRating: Number(property.average_rating) || 4.8,
     reviewsCount: property.reviews_count || 0,
     isAvailable: property.is_available,
+    isDemo: property.is_demo === true,
     availableCount: 3,
     maxGuests: property.max_guests,
     bedrooms: property.bedrooms,

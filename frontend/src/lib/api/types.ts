@@ -154,6 +154,7 @@ export interface BackendProperty {
   images: string[];
   status: PropertyStatus;
   is_available: boolean;
+  is_demo?: boolean | null;
   average_rating: number | string;
   reviews_count: number;
   moderation_note?: string | null;

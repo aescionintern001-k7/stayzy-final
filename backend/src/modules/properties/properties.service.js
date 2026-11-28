@@ -25,6 +25,7 @@ export const PROPERTY_COLUMNS = [
   "images",
   "status",
   "is_available",
+  "is_demo",
   "tagline",
   "rules",
   "check_in_time",
@@ -67,7 +68,7 @@ const verifyHostAccount = async (hostId) => {
 /**
  * Format raw database row to attach structured host details.
  */
-const formatPropertyRow = (row) => {
+export const formatPropertyRow = (row) => {
   if (!row) return null;
 
   const property = {
@@ -98,6 +99,7 @@ const formatPropertyRow = (row) => {
       : JSON.parse(row.images || "[]"),
     status: row.status,
     is_available: row.is_available,
+    is_demo: row.is_demo === true,
     tagline: row.tagline ?? null,
     rules: row.rules ?? null,
     check_in_time: row.check_in_time || "12:00 PM",

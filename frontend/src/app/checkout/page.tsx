@@ -8,6 +8,10 @@ import { StayzyLogo } from "@/components/common/StayzyLogo";
 import { calculateBookingPricing } from "@/lib/pricing";
 import { DurationType } from "@/lib/types";
 import {
+  isDemoPropertyEligible,
+  shouldOpenDemoSimulatorModal,
+} from "@/lib/checkout/demoEligibility";
+import {
   ShieldCheck,
   Clock,
   MapPin,
@@ -39,9 +43,9 @@ function CheckoutContent() {
   const includeFood = searchParams.get("includeFood") === "true";
 
   // Guest details form state
-  const [guestName, setGuestName] = useState("Aarav Sharma");
-  const [guestEmail, setGuestEmail] = useState("aarav.sharma@example.com");
-  const [guestPhone, setGuestPhone] = useState("+91 98765 12345");
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
   const [guestCount, setGuestCount] = useState(1);
   const [specialRequests, setSpecialRequests] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -78,6 +82,20 @@ function CheckoutContent() {
   const [paymentSession, setPaymentSession] = useState<any>(null);
   const [processingWebhook, setProcessingWebhook] = useState(false);
   const idempotencyKeyRef = useRef<string>("");
+
+  const isDemoProperty = isDemoPropertyEligible(roomData, loading);
+
+  // Clear stale payment/simulator modal state if property changes or is not demo-eligible
+  useEffect(() => {
+    setPaymentModalOpen(false);
+    setPaymentSession(null);
+  }, [roomTypeId]);
+
+  useEffect(() => {
+    if (!isDemoProperty && paymentModalOpen) {
+      setPaymentModalOpen(false);
+    }
+  }, [isDemoProperty, paymentModalOpen]);
 
   useEffect(() => {
     idempotencyKeyRef.current =
@@ -206,7 +224,9 @@ function CheckoutContent() {
       },
     });
     setCheckoutOutcome("payment_required");
-    setPaymentModalOpen(true);
+    if (shouldOpenDemoSimulatorModal(roomData, loading)) {
+      setPaymentModalOpen(true);
+    }
   };
 
   // Handle Form Submission -> Create Booking & Initiate Payment (with safe timeout recovery)
@@ -355,7 +375,9 @@ function CheckoutContent() {
 
       setPaymentSession(data);
       setCheckoutOutcome("payment_required");
-      setPaymentModalOpen(true);
+      if (shouldOpenDemoSimulatorModal(roomData, loading)) {
+        setPaymentModalOpen(true);
+      }
     } catch (err: any) {
       const msg = err.message || "Unable to complete booking request.";
       setCheckoutOutcome((prev) => (prev === "recovering" ? "backend_unavailable" : "failed"));
@@ -373,7 +395,7 @@ function CheckoutContent() {
 
   // Complete payment via authoritative Express flow or local signed webhook fallback
   const handleSimulatePaymentWebhook = async (status: "SUCCESS" | "FAILED") => {
-    if (!paymentSession) return;
+    if (!paymentSession || !isDemoProperty) return;
     setProcessingWebhook(true);
 
     try {
@@ -918,8 +940,29 @@ function CheckoutContent() {
         </aside>
       </form>
 
-      {/* Demo Payment Gateway Modal */}
-      {paymentModalOpen && paymentSession && (
+      {/* Normal Payment Order Status (non-demo / unknown properties) */}
+      {checkoutOutcome === "payment_required" && paymentSession && !isDemoProperty && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="p-5 rounded-2xl bg-[#EAF5E4] border border-[#CBE4C3] space-y-2 text-xs text-[#102C2B]">
+            <div className="flex items-center gap-2 font-extrabold text-sm text-[#064E38]">
+              <ShieldCheck className="w-4 h-4 text-[#087B50]" />
+              <span>Booking Created — Payment Order Ready</span>
+            </div>
+            <p className="text-[#4A6158]">
+              Booking Ref: <strong className="text-[#102C2B]">{paymentSession.bookingReference}</strong>
+              {paymentSession.paymentDetails?.transactionRef ? (
+                <> · Order ID: <code className="font-mono">{paymentSession.paymentDetails.transactionRef}</code></>
+              ) : null}
+            </p>
+            <p className="text-[#4A6158]">
+              Amount Due: <strong className="text-[#064E38]">₹{Number(paymentSession.payableNow || 0).toLocaleString("en-IN")}</strong>. Complete payment through the standard Razorpay checkout flow from your bookings dashboard.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Demo Payment Gateway Modal (strictly restricted to verified demo properties) */}
+      {paymentModalOpen && paymentSession && isDemoProperty && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-[24px] max-w-md w-full p-6 sm:p-8 relative shadow-2xl space-y-6 animate-in zoom-in-95 duration-200 border border-[#E9E3D5]">
             <div className="text-center space-y-2">
@@ -930,13 +973,9 @@ function CheckoutContent() {
               <h3 className="text-xl font-extrabold text-[#064E38]">
                 Stayzy Secure Payment Portal
               </h3>
-              {(roomData?.name?.startsWith("[DEMO]") ||
-                roomData?.property?.name?.startsWith("[DEMO]") ||
-                Boolean(roomData?.isDemo)) && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
-                  DEMO BOOKING · SIMULATED PAYMENT · NO REAL MONEY CHARGED
-                </div>
-              )}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+                DEMO BOOKING · SIMULATED PAYMENT · NO REAL MONEY CHARGED
+              </div>
               <p className="text-xs text-[#5E6E65]">
                 Ref: <code>{paymentSession.paymentDetails.transactionRef}</code>
               </p>

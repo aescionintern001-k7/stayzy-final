@@ -15,7 +15,7 @@ export const pool = new Pool(
     ? {
         connectionString: env.DATABASE_URL,
         ssl: env.DB_SSL || env.DATABASE_URL.includes("sslmode=require")
-          ? { rejectUnauthorized: false }
+          ? { rejectUnauthorized: env.APP_ENV === "production" }
           : undefined,
         ...basePoolConfig,
       }
