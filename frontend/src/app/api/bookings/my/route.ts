@@ -1,84 +1,67 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
-import { getCurrentUser, JWT_COOKIE_NAME } from "@/lib/auth";
+import { JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 import { backendBookingToFrontend } from "@/lib/api/adapters";
 import { BackendBooking } from "@/lib/api/types";
 
-const BACKEND_URL =
-  process.env.API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5000/api/v1";
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
 
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: "Please sign in to view your bookings." },
-        { status: 401 }
-      );
-    }
-
-    // 1. Attempt authoritative Express backend
     const cookieStore = await cookies();
     const token =
       cookieStore.get(JWT_COOKIE_NAME)?.value ||
       cookieStore.get("token")?.value ||
       request.headers.get("Authorization")?.replace("Bearer ", "");
 
-    if (token && token.includes(".")) {
-      try {
-        const backendRes = await fetch(`${BACKEND_URL}/bookings`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          cache: "no-store",
-        });
-
-        if (backendRes.ok) {
-          const data = await backendRes.json();
-          const backendBookings: BackendBooking[] = data.data?.bookings || [];
-
-          if (backendBookings.length > 0) {
-            const adapted = backendBookings.map((b) => backendBookingToFrontend(b));
-            return NextResponse.json({
-              success: true,
-              bookings: adapted,
-              source: "express_backend",
-            });
-          }
-        }
-      } catch (backendErr) {
-        console.warn("[Bookings API] Express backend unreachable, falling back to local database");
-      }
+    if (!token || !token.includes(".")) {
+      return NextResponse.json(
+        { error: "Please sign in to view your bookings." },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
 
-    // 2. Local database fallback
-    const bookings = await prisma.booking.findMany({
-      where: {
-        OR: [{ userId: user.id }, { guestEmail: user.email }],
-      },
-      include: {
-        property: true,
-        roomType: true,
-        inventoryUnit: true,
-        payments: true,
-        paymentSchedules: {
-          orderBy: { dueDate: "asc" },
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/bookings`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        refunds: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Booking service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    return NextResponse.json({
-      success: true,
-      bookings,
-      source: "local_prisma",
-    });
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errData.message || errData.error || "Unable to load bookings." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const data = await backendRes.json();
+    const backendBookings: BackendBooking[] = data.data?.bookings || [];
+    const adapted = backendBookings.map((b) => backendBookingToFrontend(b));
+
+    return NextResponse.json(
+      {
+        success: true,
+        bookings: adapted,
+        source: "express_backend",
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || "Unable to load bookings." },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

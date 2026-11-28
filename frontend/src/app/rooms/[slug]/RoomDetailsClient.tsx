@@ -202,7 +202,7 @@ export function RoomDetailsClient({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            roomTypeId: room.id,
+            roomTypeId: room.roomTypeId || room.id,
             durationType: selectedDuration,
             startDate,
             startTime,
@@ -232,14 +232,37 @@ export function RoomDetailsClient({
     setHolding(true);
     setHoldError(null);
 
-    let holdToken = `HOLD_${Date.now()}`;
+    const effectiveRoomTypeId = room.roomTypeId || room.id;
+    const baseParams = new URLSearchParams();
+    baseParams.set("roomTypeId", effectiveRoomTypeId);
+    baseParams.set("durationType", selectedDuration);
+    baseParams.set("startDate", startDate);
+    baseParams.set("startTime", startTime);
+    baseParams.set("durationCount", String(durationCount));
+    if (includeFood) baseParams.set("includeFood", "true");
 
+    try {
+      const userRes = await fetch("/api/auth/me");
+      const userContentType = userRes.headers.get("content-type") || "";
+      if (userRes.ok && userContentType.includes("application/json")) {
+        const userData = await userRes.json();
+        if (!userData.user) {
+          setHolding(false);
+          router.push(`/login?redirect=${encodeURIComponent(`/checkout?${baseParams.toString()}`)}`);
+          return;
+        }
+      }
+    } catch {
+      // Proceed to hold endpoint which will enforce auth if required
+    }
+
+    let holdToken = "";
     try {
       const res = await fetch("/api/checkout/hold", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          roomTypeId: room.id,
+          roomTypeId: effectiveRoomTypeId,
           durationType: selectedDuration,
           startDate,
           startTime,
@@ -248,40 +271,37 @@ export function RoomDetailsClient({
       });
 
       const contentType = res.headers.get("content-type") || "";
-      if (res.ok && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (data.token || data.holdToken) {
-          holdToken = data.token || data.holdToken;
-        }
+      const data = contentType.includes("application/json")
+        ? await res.json().catch(() => ({}))
+        : {};
+
+      if (!res.ok) {
+        const msg = data.error || data.message || "Unable to reserve room hold. Please try again.";
+        setHoldError(msg);
+        toast.error("Hold Failed", msg);
+        setHolding(false);
+        return;
       }
+
+      holdToken = data.token || data.holdToken || "";
     } catch {
-      // Fallback to local hold token
+      const msg = "Unable to connect to the booking service. Please try again.";
+      setHoldError(msg);
+      toast.error("Connection Error", msg);
+      setHolding(false);
+      return;
     }
 
-    const checkoutParams = new URLSearchParams();
-    checkoutParams.set("holdToken", holdToken);
-    checkoutParams.set("roomTypeId", room.id);
-    checkoutParams.set("durationType", selectedDuration);
-    checkoutParams.set("startDate", startDate);
-    checkoutParams.set("startTime", startTime);
-    checkoutParams.set("durationCount", String(durationCount));
-    if (includeFood) checkoutParams.set("includeFood", "true");
+    if (!holdToken) {
+      const msg = "Reservation hold could not be created. Please try again.";
+      setHoldError(msg);
+      toast.error("Hold Failed", msg);
+      setHolding(false);
+      return;
+    }
 
-    const checkoutUrl = `/checkout?${checkoutParams.toString()}`;
-
-    try {
-      const userRes = await fetch("/api/auth/me");
-      const contentType = userRes.headers.get("content-type") || "";
-      if (userRes.ok && contentType.includes("application/json")) {
-        const userData = await userRes.json();
-        if (!userData.user) {
-          router.push(`/login?redirect=${encodeURIComponent(checkoutUrl)}`);
-          return;
-        }
-      }
-    } catch {}
-
-    router.push(checkoutUrl);
+    baseParams.set("holdToken", holdToken);
+    router.push(`/checkout?${baseParams.toString()}`);
   };
 
   // Derived neighborhood data based on property

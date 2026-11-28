@@ -14,7 +14,7 @@ export const bookingsApi = {
    */
   async checkAvailability(query: CheckAvailabilityQuery): Promise<AvailabilityResult> {
     const res = await apiClient.get<AvailabilityResult>("/bookings/availability", {
-      params: query as any,
+      params: query as unknown as Record<string, string | number | boolean | undefined | null>,
     });
     return res.data;
   },
@@ -31,7 +31,9 @@ export const bookingsApi = {
    * Authenticated: Get booking history for current user (Guest sees own, Host sees owned)
    */
   async getMyBookings(query?: ListBookingsQuery) {
-    return apiClient.get<BackendBooking[]>("/bookings", { params: query as any });
+    return apiClient.get<BackendBooking[]>("/bookings", {
+      params: query as unknown as Record<string, string | number | boolean | undefined | null>,
+    });
   },
 
   /**

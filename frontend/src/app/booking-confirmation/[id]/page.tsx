@@ -1,7 +1,9 @@
 import React from "react";
 import Link from "next/link";
-import prisma from "@/lib/prisma";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 import { Footer } from "@/components/common/Footer";
 import { PrintReceiptButton } from "@/components/common/PrintReceiptButton";
 import { StayzyLogo } from "@/components/common/StayzyLogo";
@@ -20,15 +22,7 @@ import {
   Mail,
   Home,
 } from "lucide-react";
-export async function generateStaticParams() {
-  try {
-    const bookings = await prisma.booking.findMany({ select: { id: true } });
-    if (!bookings || bookings.length === 0) return [{ id: "preview" }];
-    return bookings.map((b) => ({ id: b.id }));
-  } catch {
-    return [{ id: "preview" }];
-  }
-}
+export const dynamic = "force-dynamic";
 
 export default async function BookingConfirmationPage({
   params,
@@ -37,22 +31,57 @@ export default async function BookingConfirmationPage({
 }) {
   const { id } = await params;
 
-  const booking = await prisma.booking.findFirst({
-    where: {
-      OR: [{ id }, { bookingReference: id }],
-    },
-    include: {
-      property: true,
-      roomType: true,
-      inventoryUnit: {
-        include: { room: true },
-      },
-      payments: true,
-      paymentSchedules: {
-        orderBy: { dueDate: "asc" },
-      },
-    },
-  });
+  let booking: any = null;
+  const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (UUID_REGEX.test(id)) {
+    try {
+      const cookieStore = await cookies();
+      const token =
+        cookieStore.get(JWT_COOKIE_NAME)?.value || cookieStore.get("token")?.value;
+      if (token && token.includes(".")) {
+        const res = await fetch(`${getServerBackendUrl()}/bookings/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const b = json.data?.booking || json.data;
+          if (b) {
+            booking = {
+              id: b.id,
+              bookingReference: b.booking_reference || b.id,
+              guestEmail: b.guest_email || b.guest?.email || "guest@stayzy.in",
+              roomType: { name: b.room_type_name || b.property_title || "Stayzy Suite" },
+              inventoryUnit: b.inventory_unit_label ? { identifier: b.inventory_unit_label } : null,
+              property: {
+                name: b.property_title || "Stayzy Property",
+                address: b.property_address || b.property_city || "",
+              },
+              startTime: new Date(b.start_time || b.check_in_date || Date.now()),
+              endTime: new Date(b.end_time || b.check_out_date || Date.now()),
+              durationCount: Number(b.duration_count || 1),
+              durationType: String(b.duration_type || "MONTHLY"),
+              basePrice: Number(b.base_price ?? b.total_price ?? 0),
+              foodCharges: Number(b.food_charges ?? 0),
+              taxes: Number(b.taxes ?? 0),
+              depositAmount: Number(b.deposit_amount ?? 0),
+              payableNow: Number(b.payable_now ?? b.total_price ?? 0),
+              totalAmount: Number(b.total_price ?? 0),
+              balanceRemaining: Number(b.balance_remaining ?? 0),
+              paymentStatus: String(b.payment_status || "unpaid").toUpperCase(),
+              status: String(b.status || "pending").toUpperCase(),
+              keylessPin: b.keyless_pin || null,
+              paymentSchedules: [],
+            };
+          }
+        }
+      }
+    } catch {
+      // Backend unavailable; do not fall back to SQLite
+    }
+  }
 
   if (!booking) {
     notFound();

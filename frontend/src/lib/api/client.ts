@@ -8,9 +8,9 @@ import { ApiResponse, ApiErrorResponse } from "./types";
 export class ApiClientError extends Error {
   public status: number;
   public code?: string;
-  public details?: any;
+  public details?: unknown;
 
-  constructor(message: string, status: number, code?: string, details?: any) {
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
@@ -20,8 +20,8 @@ export class ApiClientError extends Error {
 }
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
-  body?: any;
-  params?: Record<string, any>;
+  body?: unknown;
+  params?: object;
   token?: string | null;
 }
 
@@ -89,7 +89,7 @@ export function setClientAuthToken(token: string | null): void {
 /**
  * Unified request handler for Express Backend APIs.
  */
-export async function apiRequest<T = any>(
+export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<ApiResponse<T>> {
@@ -122,16 +122,22 @@ export async function apiRequest<T = any>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  let body = options.body;
-  if (body && typeof body === "object" && !(body instanceof FormData) && !(body instanceof URLSearchParams)) {
-    body = JSON.stringify(body);
+  let formattedBody: BodyInit | undefined;
+  if (
+    options.body instanceof FormData ||
+    options.body instanceof URLSearchParams ||
+    typeof options.body === "string"
+  ) {
+    formattedBody = options.body;
+  } else if (options.body && typeof options.body === "object") {
+    formattedBody = JSON.stringify(options.body);
   }
 
   try {
     const response = await fetch(url, {
       ...options,
       headers,
-      body,
+      body: formattedBody,
     });
 
     const isJson = response.headers.get("content-type")?.includes("application/json");
@@ -166,16 +172,14 @@ export async function apiRequest<T = any>(
       success: true,
       data: data as T,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof ApiClientError) {
       throw err;
     }
+    const message =
+      err instanceof Error ? err.message : "Failed to communicate with Stayzy backend";
     // Network / connection errors
-    throw new ApiClientError(
-      err.message || "Failed to communicate with Stayzy backend",
-      500,
-      "NETWORK_ERROR"
-    );
+    throw new ApiClientError(message, 500, "NETWORK_ERROR");
   }
 }
 
@@ -183,19 +187,19 @@ export async function apiRequest<T = any>(
  * Convenient HTTP verb helpers
  */
 export const apiClient = {
-  get: <T = any>(endpoint: string, options?: RequestOptions) =>
+  get: <T = unknown>(endpoint: string, options?: RequestOptions) =>
     apiRequest<T>(endpoint, { ...options, method: "GET" }),
 
-  post: <T = any>(endpoint: string, body?: any, options?: RequestOptions) =>
+  post: <T = unknown>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(endpoint, { ...options, method: "POST", body }),
 
-  put: <T = any>(endpoint: string, body?: any, options?: RequestOptions) =>
+  put: <T = unknown>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(endpoint, { ...options, method: "PUT", body }),
 
-  patch: <T = any>(endpoint: string, body?: any, options?: RequestOptions) =>
+  patch: <T = unknown>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(endpoint, { ...options, method: "PATCH", body }),
 
-  delete: <T = any>(endpoint: string, options?: RequestOptions) =>
+  delete: <T = unknown>(endpoint: string, options?: RequestOptions) =>
     apiRequest<T>(endpoint, { ...options, method: "DELETE" }),
 };
 

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { requireAdmin, JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
+
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
 
 const DEFAULT_SETTINGS = {
   propertyName: "Stayzy Living",
@@ -18,75 +21,108 @@ const DEFAULT_SETTINGS = {
   enableSignedWebhooks: true,
 };
 
-export async function GET() {
+async function getAdminToken(request: Request): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token =
+    cookieStore.get(JWT_COOKIE_NAME)?.value ||
+    cookieStore.get("token")?.value ||
+    request.headers.get("Authorization")?.replace("Bearer ", "");
+  return token && token.includes(".") ? token : null;
+}
+
+export async function GET(request: Request) {
   try {
     await requireAdmin();
-    const settingRecord = await prisma.siteContent.findUnique({
-      where: { key: "system_settings" },
-    });
-
-    let settings = DEFAULT_SETTINGS;
-    if (settingRecord?.value) {
-      try {
-        settings = { ...DEFAULT_SETTINGS, ...JSON.parse(settingRecord.value) };
-      } catch {
-        // fallback
-      }
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
-    return NextResponse.json({ success: true, settings });
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/settings`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin settings service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to load settings." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const remoteSettings = data.data?.settings?.platform_config || data.data?.settings || data.data || {};
+    const settings = { ...DEFAULT_SETTINGS, ...(typeof remoteSettings === "object" ? remoteSettings : {}) };
+
+    return NextResponse.json({ success: true, settings, source: "express_backend" }, { headers: NO_STORE_HEADERS });
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin();
+    await requireAdmin();
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+
     const body = await request.json();
 
-    const currentRecord = await prisma.siteContent.findUnique({
-      where: { key: "system_settings" },
-    });
-
-    let current = DEFAULT_SETTINGS;
-    if (currentRecord?.value) {
-      try {
-        current = { ...DEFAULT_SETTINGS, ...JSON.parse(currentRecord.value) };
-      } catch {}
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/settings`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          key: "platform_config",
+          value: body,
+          is_public: true,
+        }),
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin settings service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
     }
 
-    const merged = { ...current, ...body };
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to save settings." },
+        { status: backendRes.status >= 400 ? backendRes.status : 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    await prisma.siteContent.upsert({
-      where: { key: "system_settings" },
-      create: {
-        key: "system_settings",
-        value: JSON.stringify(merged),
-      },
-      update: {
-        value: JSON.stringify(merged),
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminEmail: admin.email,
-        action: "UPDATE_SYSTEM_SETTINGS",
-        entityType: "Settings",
-        entityId: "system_settings",
-        details: "Updated operational system settings",
-      },
-    });
-
-    return NextResponse.json({ success: true, settings: merged, message: "Settings saved successfully." });
+    const saved = data.data?.setting?.value || data.data?.settings || { ...DEFAULT_SETTINGS, ...body };
+    return NextResponse.json(
+      { success: true, settings: saved, message: "Settings saved successfully.", source: "express_backend" },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

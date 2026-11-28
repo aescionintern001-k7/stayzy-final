@@ -1,22 +1,17 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import prisma from "@/lib/prisma";
 import { RoomCard } from "@/components/rooms/RoomCard";
 import { backendPropertyToFrontendRoom } from "@/lib/api/adapters";
+import { getServerBackendUrl } from "@/lib/api/config";
 import { BackendProperty } from "@/lib/api/types";
-
-const BACKEND_URL =
-  process.env.API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5000/api/v1";
 
 export async function FeaturedRooms() {
   let displayRooms: any[] = [];
 
-  // 1. Attempt to fetch properties from Express backend
+  // Fetch featured properties from authoritative Express backend (PostgreSQL)
   try {
-    const backendRes = await fetch(`${BACKEND_URL}/properties?limit=6`, {
+    const backendRes = await fetch(`${getServerBackendUrl()}/properties?limit=6`, {
       cache: "no-store",
     });
 
@@ -46,73 +41,6 @@ export async function FeaturedRooms() {
     }
   } catch (err) {
     // Backend offline or unreachable
-  }
-
-  // 2. Fallback to local database if backend yielded no properties
-  if (displayRooms.length === 0) {
-    try {
-      const roomTypes = await prisma.roomType.findMany({
-        take: 6,
-        orderBy: { createdAt: "asc" },
-        include: {
-          property: true,
-          ratePlans: {
-            where: { isEnabled: true },
-          },
-          rooms: {
-            where: { status: "ACTIVE" },
-            include: {
-              inventoryUnits: {
-                where: { status: "AVAILABLE" },
-              },
-            },
-          },
-        },
-      });
-
-      displayRooms = roomTypes.map((room) => {
-        let images: string[] = [];
-        try {
-          images = JSON.parse(room.images);
-        } catch {
-          images = [];
-        }
-        if (images.length === 0 && room.property?.coverImage) {
-          images = [room.property.coverImage];
-        }
-
-        const monthlyPlan = room.ratePlans.find((r) => r.durationType === "MONTHLY") || room.ratePlans[0];
-        const availableUnits = room.rooms.reduce(
-          (acc, r) => acc + r.inventoryUnits.length,
-          0
-        );
-
-        let displayLocality = room.property.city || "Bengaluru";
-        const addr = `${room.property.name} ${room.property.address}`.toLowerCase();
-        if (addr.includes("koramangala")) displayLocality = "Koramangala";
-        else if (addr.includes("hsr")) displayLocality = "HSR Layout";
-        else if (addr.includes("indiranagar")) displayLocality = "Indiranagar";
-        else if (addr.includes("whitefield")) displayLocality = "Whitefield";
-
-        return {
-          id: room.id,
-          name: room.name,
-          slug: room.slug,
-          category: room.category,
-          genderEligibility: (room as any).genderEligibility || "COLIVING",
-          displayLocality,
-          hasAc: room.hasAc,
-          bathroomType: room.bathroomType,
-          foodIncluded: room.foodIncluded,
-          availableCount: availableUnits,
-          images,
-          currentRatePlan: monthlyPlan,
-          property: room.property,
-        };
-      });
-    } catch {
-      displayRooms = [];
-    }
   }
 
   return (

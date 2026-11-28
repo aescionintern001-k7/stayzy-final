@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { createInventoryHold, releaseInventoryHold } from "@/lib/inventory";
-import { prisma } from "@/lib/prisma";
-import { calculateBookingPricing } from "@/lib/pricing";
-import { DurationType } from "@/lib/types";
+import { cookies } from "next/headers";
+import { JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: Request) {
   try {
@@ -14,122 +16,86 @@ export async function POST(request: Request) {
       startDate,
       startTime,
       durationCount = 1,
+      includeFood = false,
       guestEmail,
     } = body;
 
-    let ratePlan: any = null;
-    try {
-      ratePlan = await prisma.ratePlan.findUnique({
-        where: {
-          roomTypeId_durationType: {
-            roomTypeId,
-            durationType: durationType as string,
-          },
-        },
-      });
-    } catch {
-      ratePlan = null;
-    }
-
-    if (!ratePlan || !ratePlan.isEnabled) {
-      const BACKEND_URL =
-        process.env.API_BASE_URL ||
-        process.env.NEXT_PUBLIC_API_BASE_URL ||
-        process.env.NEXT_PUBLIC_BACKEND_API_URL ||
-        "http://localhost:5000/api/v1";
-
-      try {
-        const propRes = await fetch(`${BACKEND_URL}/properties/${roomTypeId}`, { cache: "no-store" });
-        if (propRes.ok) {
-          const propData = await propRes.json();
-          const property = propData.data?.property || propData.data;
-          const rts = property?.room_types || [];
-          for (const rt of rts) {
-            const plan = (rt.rate_plans || []).find(
-              (rp: any) => rp.duration_type === durationType && rp.is_enabled !== false
-            );
-            if (plan) {
-              ratePlan = {
-                id: plan.id,
-                durationType: plan.duration_type,
-                price: Number(plan.price),
-                depositAmount: Number(plan.deposit_amount || 0),
-                foodMonthlyCharge: Number(plan.food_monthly_charge || 0),
-                minDuration: Number(plan.min_duration || 1),
-                maxDuration: plan.max_duration ? Number(plan.max_duration) : null,
-                isEnabled: plan.is_enabled ?? true,
-                allowedHoursStart: plan.allowed_hours_start || "08:00",
-                allowedHoursEnd: plan.allowed_hours_end || "22:00",
-                electricityRule: plan.electricity_rule || "Included in rent",
-                notes: plan.notes || null,
-              };
-              break;
-            }
-          }
-        }
-      } catch {
-        // Fallback failed
-      }
-    }
-
-    if (!ratePlan || !ratePlan.isEnabled) {
+    if (!UUID_REGEX.test(roomTypeId || "")) {
       return NextResponse.json(
-        { error: "Selected duration is not available for this room." },
+        { error: "Invalid room identifier." },
         { status: 400 }
       );
     }
 
-    const calcResult = calculateBookingPricing({
-      ratePlan,
-      durationType: durationType as DurationType,
-      durationCount: Number(durationCount),
-      startDateStr: startDate,
-      startTimeStr: startTime,
-    });
+    const cookieStore = await cookies();
+    const token =
+      cookieStore.get(JWT_COOKIE_NAME)?.value ||
+      cookieStore.get("token")?.value ||
+      request.headers.get("Authorization")?.replace("Bearer ", "");
 
-    if (!calcResult.success) {
-      return NextResponse.json({ error: calcResult.error }, { status: 400 });
+    if (!token || !token.includes(".")) {
+      return NextResponse.json(
+        { error: "Please sign in to reserve a room hold." },
+        { status: 401 }
+      );
     }
 
-    const start = new Date(calcResult.breakdown.startDateTime);
-    const end = new Date(calcResult.breakdown.endDateTime);
+    let res: Response;
+    try {
+      res = await fetch(`${getServerBackendUrl()}/holds`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          room_type_id: roomTypeId,
+          ...(UUID_REGEX.test(inventoryUnitId || "") ? { inventory_unit_id: inventoryUnitId } : {}),
+          duration_type: durationType,
+          start_date: startDate,
+          ...(startTime ? { start_time: startTime } : {}),
+          duration_count: Number(durationCount),
+          include_food: Boolean(includeFood),
+          ...(guestEmail ? { guest_email: guestEmail } : {}),
+        }),
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Booking hold service is temporarily unavailable. Please try again." },
+        { status: 503 }
+      );
+    }
 
-    const holdResult = await createInventoryHold({
-      roomTypeId,
-      inventoryUnitId,
-      durationType,
-      startTime: start,
-      endTime: end,
-      guestEmail,
-    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to reserve room hold." },
+        { status: res.status }
+      );
+    }
 
-    if (!holdResult.success) {
-      return NextResponse.json({ error: holdResult.error }, { status: 409 });
+    const hold = data.data?.hold || data.hold || data.data;
+    const holdToken = hold?.hold_token || hold?.token;
+    if (!holdToken) {
+      return NextResponse.json(
+        { error: "Invalid hold response from backend." },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      token: holdResult.token,
-      expiresAt: holdResult.expiresAt,
-      unit: holdResult.unit,
-      pricing: calcResult.breakdown,
+      source: "express_backend",
+      token: holdToken,
+      expiresAt: hold.expires_at,
+      unit: hold.unit || null,
+      pricing: data.data?.pricing || null,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const token = searchParams.get("token");
-    if (!token) {
-      return NextResponse.json({ error: "Hold token is required." }, { status: 400 });
-    }
-
-    await releaseInventoryHold(token);
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || "Unable to reserve room hold." },
+      { status: 500 }
+    );
   }
 }

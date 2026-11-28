@@ -1,43 +1,74 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { requireAdmin, JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 
-export async function GET() {
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
+
+async function getAdminToken(request: Request): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token =
+    cookieStore.get(JWT_COOKIE_NAME)?.value ||
+    cookieStore.get("token")?.value ||
+    request.headers.get("Authorization")?.replace("Bearer ", "");
+  return token && token.includes(".") ? token : null;
+}
+
+export async function GET(request: Request) {
   try {
     await requireAdmin();
-    const roomTypes = await prisma.roomType.findMany({
-      include: {
-        property: true,
-        ratePlans: true,
-        rooms: {
-          include: {
-            inventoryUnits: true,
-          },
-        },
-        _count: {
-          select: {
-            bookings: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
 
-    return NextResponse.json({ success: true, roomTypes });
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/rooms`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin rooms service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to load admin rooms." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const roomTypes = data.data?.room_types || data.data?.roomTypes || data.data?.rooms || [];
+    return NextResponse.json(
+      { success: true, roomTypes, source: "express_backend" },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin();
+    await requireAdmin();
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+
     const body = await request.json();
     const {
-      id,
       propertyId,
       name,
       slug,
@@ -57,126 +88,66 @@ export async function POST(request: Request) {
     if (!propertyId || !name || !category) {
       return NextResponse.json(
         { error: "Property ID, room name, and category are required." },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    const amenitiesJson = Array.isArray(keyAmenities)
-      ? JSON.stringify(keyAmenities)
-      : typeof keyAmenities === "string"
-      ? keyAmenities
-      : JSON.stringify(["High-Speed Wi-Fi", "Daily Housekeeping"]);
+    const payload: Record<string, unknown> = {
+      property_id: propertyId,
+      name: String(name).trim(),
+      ...(slug ? { slug: String(slug).trim() } : {}),
+      category,
+      description: description || "",
+      size_sq_ft: Number(sizeSqFt) || 220,
+      base_capacity: Number(baseCapacity) || 1,
+      max_capacity: Number(maxCapacity) || 2,
+      has_ac: Boolean(hasAc),
+      bathroom_type: bathroomType || "ATTACHED",
+      food_included: Boolean(foodIncluded),
+      ...(foodDetails ? { food_details: String(foodDetails) } : {}),
+      amenities: Array.isArray(keyAmenities) ? keyAmenities : [],
+      images: Array.isArray(images) ? images : [],
+    };
 
-    const imagesJson = Array.isArray(images)
-      ? JSON.stringify(images)
-      : typeof images === "string"
-      ? images
-      : JSON.stringify([
-          "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1200&q=80",
-        ]);
-
-    let roomType;
-    if (id) {
-      roomType = await prisma.roomType.update({
-        where: { id },
-        data: {
-          propertyId,
-          name,
-          category,
-          description: description || "",
-          sizeSqFt: Number(sizeSqFt) || 200,
-          baseCapacity: Number(baseCapacity) || 1,
-          maxCapacity: Number(maxCapacity) || 1,
-          hasAc: Boolean(hasAc),
-          bathroomType: bathroomType || "ATTACHED",
-          foodIncluded: Boolean(foodIncluded),
-          foodDetails: foodDetails || null,
-          keyAmenities: amenitiesJson,
-          images: imagesJson,
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/rooms`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify(payload),
+        cache: "no-store",
       });
-
-      await prisma.auditLog.create({
-        data: {
-          adminEmail: admin.email,
-          action: "UPDATE_ROOM_TYPE",
-          entityType: "RoomType",
-          entityId: id,
-          details: `Updated room configuration: ${name}`,
-        },
-      });
-    } else {
-      const generatedSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + `-${Date.now().toString().slice(-4)}`;
-      roomType = await prisma.roomType.create({
-        data: {
-          propertyId,
-          name,
-          slug: generatedSlug,
-          category,
-          description: description || "Comfortable and fully-serviced Stayzy accommodation.",
-          sizeSqFt: Number(sizeSqFt) || 200,
-          baseCapacity: Number(baseCapacity) || 1,
-          maxCapacity: Number(maxCapacity) || 1,
-          hasAc: hasAc !== undefined ? Boolean(hasAc) : true,
-          bathroomType: bathroomType || "ATTACHED",
-          foodIncluded: Boolean(foodIncluded),
-          foodDetails: foodDetails || null,
-          keyAmenities: amenitiesJson,
-          images: imagesJson,
-        },
-      });
-
-      // Automatically create a default physical room and unit so it can be booked immediately
-      const physicalRoom = await prisma.room.create({
-        data: {
-          roomTypeId: roomType.id,
-          roomNumber: `Room-${Math.floor(100 + Math.random() * 900)}`,
-          floor: 1,
-          status: "ACTIVE",
-        },
-      });
-
-      const isBed = category !== "PRIVATE";
-      const unitCount = category === "TRIPLE_SHARING" ? 3 : category === "TWIN_SHARING" ? 2 : 1;
-
-      for (let i = 0; i < unitCount; i++) {
-        await prisma.inventoryUnit.create({
-          data: {
-            roomId: physicalRoom.id,
-            identifier: isBed ? `Bed ${String.fromCharCode(65 + i)}` : physicalRoom.roomNumber,
-            isBed,
-            status: "AVAILABLE",
-          },
-        });
-      }
-
-      // Create default rate plans for all 5 durations so it's bookable
-      await prisma.ratePlan.createMany({
-        data: [
-          { roomTypeId: roomType.id, durationType: "HOURLY", price: 150, depositAmount: 200, minDuration: 2, maxDuration: 10 },
-          { roomTypeId: roomType.id, durationType: "DAILY", price: 900, depositAmount: 500, minDuration: 1, maxDuration: 28 },
-          { roomTypeId: roomType.id, durationType: "WEEKLY", price: 5500, depositAmount: 1500, minDuration: 1, maxDuration: 8 },
-          { roomTypeId: roomType.id, durationType: "MONTHLY", price: 18000, depositAmount: 5000, minDuration: 1, maxDuration: 11 },
-          { roomTypeId: roomType.id, durationType: "YEARLY", price: 200000, depositAmount: 10000, minDuration: 1, maxDuration: 3 },
-        ],
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          adminEmail: admin.email,
-          action: "CREATE_ROOM_TYPE",
-          entityType: "RoomType",
-          entityId: roomType.id,
-          details: `Created new room category: ${name} with units and 5 duration rate plans`,
-        },
-      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin rooms service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
     }
 
-    return NextResponse.json({ success: true, roomType, message: "Room type saved successfully." });
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to save room type." },
+        { status: backendRes.status >= 400 ? backendRes.status : 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        roomType: data.data?.room_type || data.data?.roomType || data.data,
+        message: "Room type saved successfully.",
+        source: "express_backend",
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

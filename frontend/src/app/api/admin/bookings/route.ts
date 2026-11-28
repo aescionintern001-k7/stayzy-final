@@ -1,77 +1,69 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
 import { requireAdmin, JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 
-const BACKEND_URL =
-  process.env.API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5000/api/v1";
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
 
 export async function GET(request: Request) {
   try {
     await requireAdmin();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-    const durationType = searchParams.get("durationType");
 
-    // 1. Attempt authoritative Express backend
     const cookieStore = await cookies();
     const token =
       cookieStore.get(JWT_COOKIE_NAME)?.value ||
       cookieStore.get("token")?.value ||
       request.headers.get("Authorization")?.replace("Bearer ", "");
 
-    if (token && token.includes(".")) {
-      try {
-        const backendRes = await fetch(`${BACKEND_URL}/admin/bookings`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          cache: "no-store",
-        });
-
-        if (backendRes.ok) {
-          const data = await backendRes.json();
-          const bookings = data.data?.bookings || [];
-          if (bookings.length > 0) {
-            return NextResponse.json({
-              success: true,
-              bookings,
-              source: "express_backend",
-            });
-          }
-        }
-      } catch (backendErr) {
-        console.warn("[Admin Bookings API] Express backend unreachable, using local fallback");
-      }
+    if (!token || !token.includes(".")) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
-    // 2. Local fallback
-    const where: any = {};
-    if (status && status !== "ALL") where.status = status;
-    if (durationType && durationType !== "ALL") where.durationType = durationType;
+    const query = new URLSearchParams();
+    if (status && status !== "ALL") {
+      query.set("status", status.toLowerCase());
+    }
+    const qs = query.toString();
 
-    const bookings = await prisma.booking.findMany({
-      where,
-      include: {
-        property: true,
-        roomType: true,
-        inventoryUnit: {
-          include: { room: true },
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/bookings${qs ? `?${qs}` : ""}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        payments: true,
-        refunds: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin bookings service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    return NextResponse.json({ success: true, bookings, source: "local_prisma" });
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to load admin bookings." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const bookings = data.data?.bookings || [];
+    return NextResponse.json(
+      {
+        success: true,
+        bookings,
+        source: "express_backend",
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

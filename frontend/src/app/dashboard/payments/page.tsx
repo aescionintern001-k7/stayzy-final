@@ -86,7 +86,7 @@ export default function DashboardPaymentsPage() {
                       </div>
                     </td>
                     <td className="p-3.5 font-black text-[#192621]">
-                      ₹{p.amount.toLocaleString("en-IN")}
+                      ₹{Number(p.amount ?? 0).toLocaleString("en-IN")}
                     </td>
                     <td className="p-3.5">
                       <span className="px-2 py-0.5 rounded bg-gray-100 text-[10px] font-mono">

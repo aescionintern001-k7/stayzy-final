@@ -1,79 +1,61 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { INITIAL_PROPERTIES } from "@/lib/mock-data";
-
-const BACKEND_URL =
-  process.env.API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5000/api/v1";
+import { getServerBackendUrl } from "@/lib/api/config";
 
 /**
  * Public property directory endpoint used by property visit & location selectors.
- * Tries Express backend first, then local Prisma SQLite database, then seed fallback.
+ * Uses the authoritative Express backend (PostgreSQL) only.
  */
 export async function GET() {
   try {
+    let backendRes: Response;
     try {
-      const backendRes = await fetch(`${BACKEND_URL}/properties?limit=50`, {
+      backendRes = await fetch(`${getServerBackendUrl()}/properties?limit=50`, {
         cache: "no-store",
       });
-      if (backendRes.ok) {
-        const json = await backendRes.json();
-        const list = json.data?.properties || json.properties || [];
-        if (Array.isArray(list) && list.length > 0) {
-          const normalized = list.map((p: any) => ({
-            id: p.id,
-            name: p.title || p.name,
-            slug: p.slug || p.id,
-            city: p.city || "Bengaluru",
-            address: p.address || "",
-          }));
-          return NextResponse.json({
-            success: true,
-            properties: normalized,
-            source: "express_backend",
-          });
-        }
-      }
     } catch {
-      // Backend optional offline fallback
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Property directory service is unavailable. Please ensure the backend server is running.",
+          properties: [],
+        },
+        { status: 503 }
+      );
     }
 
-    const dbProps = await prisma.property.findMany({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        city: true,
-        address: true,
-      },
-      orderBy: { name: "asc" },
-    });
-
-    if (dbProps.length > 0) {
-      return NextResponse.json({
-        success: true,
-        properties: dbProps,
-        source: "local_prisma",
-      });
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      return NextResponse.json(
+        {
+          success: false,
+          error: errData.message || errData.error || "Failed to fetch properties.",
+          properties: [],
+        },
+        { status: backendRes.status >= 400 ? backendRes.status : 502 }
+      );
     }
+
+    const json = await backendRes.json();
+    const list = json.data?.properties || json.properties || [];
+    const normalized = Array.isArray(list)
+      ? list.map((p: any) => ({
+          id: p.id,
+          name: p.title || p.name,
+          slug: p.slug || p.id,
+          city: p.city || "Bengaluru",
+          address: p.address || "",
+        }))
+      : [];
 
     return NextResponse.json({
       success: true,
-      properties: INITIAL_PROPERTIES.map((p) => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        city: p.city,
-        address: p.address,
-      })),
-      source: "initial_seed",
+      properties: normalized,
+      source: "express_backend",
     });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || "Failed to fetch properties." },
+      { success: false, error: error.message || "Failed to fetch properties.", properties: [] },
       { status: 500 }
     );
   }
 }
-

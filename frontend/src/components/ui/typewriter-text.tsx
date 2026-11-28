@@ -97,9 +97,12 @@ export function Typewriter({
       return () => clearTimeout(timeout);
     }
 
-    setIsDeleting(false);
-    setCurrentIndex(0);
-    setTextArrayIndex((prev) => (prev + 1) % textArray.length);
+    const resetTimeout = setTimeout(() => {
+      setIsDeleting(false);
+      setCurrentIndex(0);
+      setTextArrayIndex((prev) => (prev + 1) % textArray.length);
+    }, 0);
+    return () => clearTimeout(resetTimeout);
   }, [
     currentIndex,
     isDeleting,

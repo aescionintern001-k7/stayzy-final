@@ -1,72 +1,120 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { requireAdmin, JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 
-export async function GET() {
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
+
+async function getAdminToken(request: Request): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token =
+    cookieStore.get(JWT_COOKIE_NAME)?.value ||
+    cookieStore.get("token")?.value ||
+    request.headers.get("Authorization")?.replace("Bearer ", "");
+  return token && token.includes(".") ? token : null;
+}
+
+export async function GET(request: Request) {
   try {
     await requireAdmin();
-    const tickets = await prisma.supportTicket.findMany({
-      include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
-        booking: {
-          select: {
-            id: true,
-            bookingReference: true,
-            roomType: { select: { name: true } },
-            inventoryUnit: { select: { identifier: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
 
-    return NextResponse.json({ success: true, tickets });
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/support`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin support service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to load support tickets." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, tickets: data.data?.tickets || data.tickets || [], source: "express_backend" },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin();
+    await requireAdmin();
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+
     const body = await request.json();
-    const { ticketId, reply, status = "IN_PROGRESS" } = body;
+    const { ticketId, reply, status = "in_progress" } = body;
 
     if (!ticketId || !reply) {
-      return NextResponse.json({ error: "Ticket ID and reply message are required." }, { status: 400 });
+      return NextResponse.json({ error: "Ticket ID and reply message are required." }, { status: 400, headers: NO_STORE_HEADERS });
     }
 
-    const updated = await prisma.supportTicket.update({
-      where: { id: ticketId },
-      data: {
-        adminReply: reply,
-        repliedAt: new Date(),
-        status,
-      },
-    });
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/support/${encodeURIComponent(ticketId)}/reply`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          admin_reply: String(reply).trim(),
+          status: String(status).toLowerCase(),
+        }),
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin support service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    await prisma.auditLog.create({
-      data: {
-        adminEmail: admin.email,
-        action: "REPLY_SUPPORT_TICKET",
-        entityType: "SupportTicket",
-        entityId: ticketId,
-        details: `Sent reply and marked ticket as ${status}`,
-      },
-    });
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to reply to support ticket." },
+        { status: backendRes.status >= 400 ? backendRes.status : 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    return NextResponse.json({
-      success: true,
-      ticket: updated,
-      message: "Reply sent to customer successfully.",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        ticket: data.data?.ticket || data.data,
+        message: "Reply sent to customer successfully.",
+        source: "express_backend",
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
 import { BotanicalDecorations } from "@/components/common/BotanicalDecorations";
@@ -65,11 +65,26 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Payment process state
+  // Payment & recovery process state
   const [submitting, setSubmitting] = useState(false);
+  const [checkoutOutcome, setCheckoutOutcome] = useState<
+    "idle" | "processing" | "recovering" | "payment_required" | "backend_unavailable" | "failed"
+  >("idle");
+  const [pendingExpressBooking, setPendingExpressBooking] = useState<{
+    bookingId: string;
+    bookingReference: string;
+  } | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentSession, setPaymentSession] = useState<any>(null);
   const [processingWebhook, setProcessingWebhook] = useState(false);
+  const idempotencyKeyRef = useRef<string>("");
+
+  useEffect(() => {
+    idempotencyKeyRef.current =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? `web-chk-${crypto.randomUUID()}`
+        : `web-chk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }, [roomTypeId, durationType, startDate, startTime, durationCount, includeFood]);
 
   // 15-minute temporary hold countdown timer
   const [secondsRemaining, setSecondsRemaining] = useState(15 * 60);
@@ -100,7 +115,9 @@ function CheckoutContent() {
             ? await roomRes.json()
             : { success: false };
           if (roomList.success && Array.isArray(roomList.rooms)) {
-            currentRoom = roomList.rooms.find((r: any) => r.id === roomTypeId);
+            currentRoom = roomList.rooms.find(
+              (r: any) => r.id === roomTypeId || r.roomTypeId === roomTypeId
+            );
             setRoomData(currentRoom);
           }
         } catch {}
@@ -162,22 +179,100 @@ function CheckoutContent() {
     }
   }, [roomTypeId, durationType, startDate, startTime, durationCount, includeFood]);
 
-  // Handle Form Submission -> Create Booking & Initiate Payment
-  const handleSubmitBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Helper to initiate Express payment order for an already-created booking
+  const initiateOrderForBooking = async (bookingId: string, bookingReference?: string) => {
+    const orderRes = await fetch("/api/payments/create-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+    const orderJson = await orderRes.json().catch(() => ({}));
+    if (!orderRes.ok) {
+      throw new Error(orderJson.error || orderJson.message || "Failed to initiate payment order.");
+    }
+    const orderData = orderJson.data || orderJson;
+    setPaymentSession({
+      success: true,
+      source: "express_backend",
+      bookingId,
+      bookingReference: bookingReference || bookingId,
+      payableNow: Number(pricing?.payableNow || 0),
+      currency: "INR",
+      paymentDetails: {
+        mode: "razorpay",
+        order: orderData.order,
+        keyId: orderData.key_id,
+        transactionRef: orderData.order?.id,
+      },
+    });
+    setCheckoutOutcome("payment_required");
+    setPaymentModalOpen(true);
+  };
+
+  // Handle Form Submission -> Create Booking & Initiate Payment (with safe timeout recovery)
+  const submitBookingAttempt = async () => {
+    if (submitting) return;
     setError(null);
 
-    if (!termsAccepted) {
-      setError("Please review and accept the Stayzy Booking & Cancellation terms.");
+    if (!guestName.trim() || guestName.trim().length < 2) {
+      const msg = "Please enter your full legal name (at least 2 characters).";
+      setError(msg);
+      setCheckoutOutcome("failed");
+      toast.error("Check Guest Details", msg);
       return;
     }
 
+    if (!guestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) {
+      const msg = "Please enter a valid email address.";
+      setError(msg);
+      setCheckoutOutcome("failed");
+      toast.error("Check Guest Details", msg);
+      return;
+    }
+
+    if (!guestPhone.trim() || guestPhone.replace(/\D/g, "").length < 7) {
+      const msg = "Please enter a valid mobile phone number.";
+      setError(msg);
+      setCheckoutOutcome("failed");
+      toast.error("Check Guest Details", msg);
+      return;
+    }
+
+    if (!termsAccepted) {
+      const msg = "Please review and accept the Stayzy Booking & Cancellation terms.";
+      setError(msg);
+      setCheckoutOutcome("failed");
+      toast.error("Terms Required", msg);
+      return;
+    }
+
+    const idempotencyKey =
+      idempotencyKeyRef.current ||
+      `web-chk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    idempotencyKeyRef.current = idempotencyKey;
+
     try {
       setSubmitting(true);
+
+      // If booking was already created on Express and only payment order failed, retry order only
+      if (pendingExpressBooking?.bookingId) {
+        setCheckoutOutcome("processing");
+        await initiateOrderForBooking(
+          pendingExpressBooking.bookingId,
+          pendingExpressBooking.bookingReference
+        );
+        return;
+      }
+
+      setCheckoutOutcome("processing");
       const res = await fetch("/api/checkout/create-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({
+          idempotencyKey,
           holdToken,
           roomTypeId,
           durationType,
@@ -209,26 +304,119 @@ function CheckoutContent() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
+      if (data?.bookingCreated && data?.bookingId) {
+        setPendingExpressBooking({
+          bookingId: data.bookingId,
+          bookingReference: data.bookingReference || data.bookingId,
+        });
+        setCheckoutOutcome("payment_required");
+        setError(data.error || "Booking created, but payment initiation failed. Click Retry Safely.");
+        return;
+      }
+
+      if (res.status === 503 || res.status === 504 || data?.uncertainOutcome) {
+        setCheckoutOutcome("recovering");
+        const recRes = await fetch(`/api/bookings/recover/${encodeURIComponent(idempotencyKey)}`, {
+          cache: "no-store",
+        }).catch(() => null);
+
+        if (recRes && recRes.ok) {
+          const recJson = await recRes.json().catch(() => ({}));
+          const recovered = recJson?.booking;
+          if (recovered?.id) {
+            if (String(recovered.payment_status).toLowerCase() === "paid") {
+              router.push(`/booking-confirmation/${recovered.id}`);
+              return;
+            }
+            setPendingExpressBooking({
+              bookingId: recovered.id,
+              bookingReference: recovered.booking_reference || recovered.id,
+            });
+            await initiateOrderForBooking(recovered.id, recovered.booking_reference);
+            return;
+          }
+        }
+
+        setCheckoutOutcome("backend_unavailable");
+        const unavailMsg =
+          data?.error ||
+          "Booking service is temporarily unavailable or timed out. Your details and attempt key are preserved—please retry safely.";
+        setError(unavailMsg);
+        toast.error("Service Unavailable", unavailMsg);
+        return;
+      }
+
       if (!res.ok || !data.success) {
+        setCheckoutOutcome("failed");
         throw new Error(data.error || "Failed to create booking.");
       }
 
       setPaymentSession(data);
+      setCheckoutOutcome("payment_required");
       setPaymentModalOpen(true);
     } catch (err: any) {
-      setError(err.message);
+      const msg = err.message || "Unable to complete booking request.";
+      setCheckoutOutcome((prev) => (prev === "recovering" ? "backend_unavailable" : "failed"));
+      setError(msg);
+      toast.error("Booking Error", msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Simulate payment completion via signed webhook
+  const handleSubmitBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitBookingAttempt();
+  };
+
+  // Complete payment via authoritative Express flow or local signed webhook fallback
   const handleSimulatePaymentWebhook = async (status: "SUCCESS" | "FAILED") => {
     if (!paymentSession) return;
     setProcessingWebhook(true);
 
     try {
+      if (paymentSession.source === "express_backend" || paymentSession.paymentDetails?.mode === "razorpay") {
+        const orderId = paymentSession.paymentDetails?.order?.id;
+        if (status === "SUCCESS") {
+          const res = await fetch("/api/payments/demo-simulate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              booking_id: paymentSession.bookingId,
+              razorpay_order_id: orderId,
+              outcome: "SUCCESS",
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || data.message || "Payment verification failed.");
+          }
+          toast.success("Payment Successful", "Your booking has been confirmed!");
+          router.push(`/booking-confirmation/${paymentSession.bookingId}`);
+          return;
+        }
+
+        if (orderId) {
+          await fetch("/api/payments/fail", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: orderId,
+              error_code: "PAYMENT_FAILED",
+              error_description: "Payment cancelled or failed by user",
+            }),
+          });
+        }
+        toast.warning(
+          "Payment Unsuccessful",
+          "Payment was marked as FAILED. The booking remains in unpaid status."
+        );
+        setPaymentModalOpen(false);
+        return;
+      }
+
       const payload = JSON.stringify({
         paymentId:
           paymentSession.paymentDetails.paymentId || paymentSession.paymentDetails.transactionRef,
@@ -379,13 +567,26 @@ function CheckoutContent() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>{error}</span>
+        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          {(checkoutOutcome === "backend_unavailable" || checkoutOutcome === "payment_required") && (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => void submitBookingAttempt()}
+              className="px-3.5 py-1.5 rounded-lg bg-[#064E38] text-white text-xs font-bold hover:bg-[#053D2C] transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {submitting ? "Checking..." : "Retry Safely"}
+            </button>
+          )}
         </div>
       )}
 
       <form
+        noValidate
         onSubmit={handleSubmitBooking}
         className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.65fr)_minmax(340px,1fr)] gap-7 lg:gap-8 items-start"
       >
@@ -532,6 +733,26 @@ function CheckoutContent() {
                 I acknowledge the Stayzy Booking Guidelines, Cancellation Terms, and confirm that the guest details provided are accurate.
               </span>
             </label>
+
+            {/* Inline Error Near Pay Button (prevents off-screen silent failure) */}
+            {error && (
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+                {(checkoutOutcome === "backend_unavailable" || checkoutOutcome === "payment_required") && (
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => void submitBookingAttempt()}
+                    className="px-3 py-1 rounded-lg bg-[#064E38] text-white text-xs font-bold hover:bg-[#053D2C] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {submitting ? "Checking..." : "Retry Safely"}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Primary Payment Button */}
             <button

@@ -49,35 +49,97 @@ export function Hero() {
   const [roomsCount, setRoomsCount] = useState(1);
   const [guestsCount, setGuestsCount] = useState(1);
 
-  // Video background reference & autoplay management
+  // Video background reference & viewport/visibility-aware autoplay management
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+
+    const updateVideoSrc = () => {
+      if (motionQuery.matches) {
+        setVideoSrc(null);
+        return;
+      }
+      setVideoSrc(
+        mobileQuery.matches
+          ? "/videos/hero-cinematic-mobile.mp4"
+          : "/videos/stayzy_hotel_commercial_scenes_1080p.mp4"
+      );
+    };
+
+    updateVideoSrc();
+    motionQuery.addEventListener("change", updateVideoSrc);
+    mobileQuery.addEventListener("change", updateVideoSrc);
+
+    return () => {
+      motionQuery.removeEventListener("change", updateVideoSrc);
+      mobileQuery.removeEventListener("change", updateVideoSrc);
+    };
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !videoSrc) return;
 
     // Enforce muted for universal browser autoplay compliance
     video.muted = true;
     video.defaultMuted = true;
 
-    const playPromise = video.play();
-    if (playPromise !== undefined) {
-      playPromise.catch((err) => {
-        console.warn("Autoplay was prevented by browser policy, fallback poster active:", err);
-      });
-    }
+    let isInView = true;
+
+    const syncPlayback = () => {
+      if (isInView && !document.hidden) {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.warn("Autoplay was prevented by browser policy, fallback poster active:", err);
+          });
+        }
+      } else {
+        video.pause();
+      }
+    };
+
+    syncPlayback();
+
+    const observer =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            (entries) => {
+              const entry = entries[0];
+              if (!entry) return;
+              isInView = entry.isIntersecting;
+              syncPlayback();
+            },
+            { threshold: 0.05 }
+          )
+        : null;
+
+    observer?.observe(video);
+
+    const handleVisibilityChange = () => {
+      syncPlayback();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Seamless loop without black flash
     const handleEnded = () => {
+      if (!isInView || document.hidden) return;
       video.currentTime = 0;
       video.play().catch(() => {});
     };
 
     video.addEventListener("ended", handleEnded);
     return () => {
+      observer?.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       video.removeEventListener("ended", handleEnded);
     };
-  }, []);
+  }, [videoSrc]);
 
   // Refs for click outside
   const searchBarRef = useRef<HTMLDivElement>(null);
@@ -140,24 +202,20 @@ export function Hero() {
         {/* Full-screen HTML5 Autoplay Looping Video (Uploaded Stayzy Hotel Commercial) */}
         <video
           ref={videoRef}
-          autoPlay
+          src={videoSrc ?? undefined}
+          autoPlay={Boolean(videoSrc)}
           muted
           loop
           playsInline
           webkit-playsinline="true"
-          preload="auto"
+          preload="metadata"
           poster="/videos/hero-poster-4k.jpg"
           disablePictureInPicture
           disableRemotePlayback
           className="absolute inset-0 w-full h-full object-cover object-center transform scale-[1.01]"
           aria-hidden="true"
           tabIndex={-1}
-        >
-          <source
-            src="/videos/stayzy_hotel_commercial_scenes_1080p.mp4"
-            type="video/mp4"
-          />
-        </video>
+        />
 
         {/* Master Dark Left-to-Right Gradient Overlay for Optimal Text Contrast */}
         <div

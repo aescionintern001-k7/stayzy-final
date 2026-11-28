@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
+import { JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ALLOWED_TIME_SLOTS = new Set([
   "10:00 AM",
@@ -30,6 +35,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       propertyId,
+      roomTypeId,
       customerName,
       customerEmail,
       customerPhone,
@@ -58,7 +64,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       return NextResponse.json(
         { error: "Please enter a valid email address." },
         { status: 400 }
@@ -85,44 +91,65 @@ export async function POST(request: Request) {
       );
     }
 
-    // Resolve either primary key ID or URL slug to guarantee valid Property foreign key
-    const matchedProperty = await prisma.property.findFirst({
-      where: {
-        OR: [{ id: propertyId }, { slug: propertyId }],
-      },
-      select: { id: true, name: true, city: true, address: true },
-    });
+    const preferredDateYmd = /^\d{4}-\d{2}-\d{2}$/.test(String(preferredDate).trim())
+      ? String(preferredDate).trim()
+      : parsedDate.toISOString().split("T")[0];
 
-    if (!matchedProperty) {
+    const cookieStore = await cookies();
+    const token =
+      cookieStore.get(JWT_COOKIE_NAME)?.value ||
+      cookieStore.get("token")?.value ||
+      request.headers.get("Authorization")?.replace("Bearer ", "");
+
+    const payload: Record<string, unknown> = {
+      ...(UUID_REGEX.test(String(propertyId))
+        ? { property_id: propertyId }
+        : { room_slug: String(propertyId) }),
+      ...(roomTypeId && UUID_REGEX.test(String(roomTypeId)) ? { room_type_id: roomTypeId } : {}),
+      customer_name: trimmedName,
+      customer_phone: normalizedPhone,
+      customer_email: trimmedEmail,
+      preferred_date: preferredDateYmd,
+      time_slot: trimmedSlot,
+      ...(notes ? { notes: String(notes).trim() } : {}),
+    };
+
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/visits/schedule`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && token.includes(".") ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      });
+    } catch {
       return NextResponse.json(
-        { error: "Selected property location was not found. Please pick a valid Stayzy residence." },
-        { status: 400 }
+        { error: "Visit scheduling service is unavailable. Please ensure the backend server is running." },
+        { status: 503 }
       );
     }
 
-    const visit = await prisma.visitRequest.create({
-      data: {
-        propertyId: matchedProperty.id,
-        customerName: trimmedName,
-        customerEmail: trimmedEmail,
-        customerPhone: normalizedPhone,
-        preferredDate: parsedDate,
-        timeSlot: trimmedSlot,
-        notes: typeof notes === "string" && notes.trim() ? notes.trim() : null,
-        status: "SCHEDULED",
-      },
-    });
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to schedule visit." },
+        { status: backendRes.status >= 400 ? backendRes.status : 400 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      visit: {
-        ...visit,
-        propertyName: matchedProperty.name,
-        propertyCity: matchedProperty.city,
-      },
-      message: "Visit successfully scheduled! Our Community Host will call you shortly to confirm.",
+      visit: data.data?.visit || data.data || data.visit,
+      message: data.message || "Visit scheduled successfully.",
+      source: "express_backend",
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Failed to schedule visit." }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || "Unable to schedule visit." },
+      { status: 500 }
+    );
   }
 }

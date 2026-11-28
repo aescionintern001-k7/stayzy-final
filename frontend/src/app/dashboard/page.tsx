@@ -87,16 +87,16 @@ export default function DashboardOverviewPage() {
     schedules.find((s: any) => s.status === "PENDING");
 
   const totalPaid = payments
-    .filter((p: any) => p.status === "COMPLETED")
-    .reduce((sum: number, p: any) => sum + p.amount, 0);
+    .filter((p: any) => p.status === "COMPLETED" || p.status === "SUCCESS" || p.status === "captured")
+    .reduce((sum: number, p: any) => sum + Number(p.amount ?? 0), 0);
 
   const pendingDues = schedules
     .filter((s: any) => s.status === "PENDING")
-    .reduce((sum: number, s: any) => sum + s.amount, 0);
+    .reduce((sum: number, s: any) => sum + Number(s.amount ?? 0), 0);
 
   const depositHeld = bookings
     .filter((b: any) => b.status === "CONFIRMED")
-    .reduce((sum: number, b: any) => sum + (b.securityDeposit || 0), 0);
+    .reduce((sum: number, b: any) => sum + Number(b.securityDeposit ?? b.depositAmount ?? 0), 0);
 
   let currentStayImage = "/images/rooms/private-room-main.webp?v=5";
   if (activeOrUpcomingStay) {
@@ -497,7 +497,7 @@ export default function DashboardOverviewPage() {
 
                 <div className="flex items-center gap-4">
                   <span className="font-extrabold text-sm text-[#064B35]">
-                    ₹{b.totalAmount.toLocaleString("en-IN")}
+                    ₹{Number(b.totalAmount ?? b.totalPrice ?? 0).toLocaleString("en-IN")}
                   </span>
                   <Link
                     href={`/dashboard/bookings/${b.id}`}

@@ -37,7 +37,9 @@ export const paymentsApi = {
    * Authenticated: List current user's payment transactions
    */
   async getMyPayments(query?: { page?: number; limit?: number }) {
-    return apiClient.get<BackendPayment[]>("/payments/my", { params: query as any });
+    return apiClient.get<BackendPayment[]>("/payments/my", {
+      params: query as Record<string, string | number | boolean | undefined | null>,
+    });
   },
 
   /**

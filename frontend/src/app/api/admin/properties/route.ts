@@ -1,89 +1,79 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
 import { requireAdmin, JWT_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
 
-const BACKEND_URL =
-  process.env.API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5000/api/v1";
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
+
+async function getAdminToken(request: Request): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token =
+    cookieStore.get(JWT_COOKIE_NAME)?.value ||
+    cookieStore.get("token")?.value ||
+    request.headers.get("Authorization")?.replace("Bearer ", "");
+  return token && token.includes(".") ? token : null;
+}
 
 export async function GET(request: Request) {
   try {
     await requireAdmin();
-
-    // 1. Attempt authoritative Express backend
-    const cookieStore = await cookies();
-    const token =
-      cookieStore.get(JWT_COOKIE_NAME)?.value ||
-      cookieStore.get("token")?.value ||
-      request.headers.get("Authorization")?.replace("Bearer ", "");
-
-    if (token && token.includes(".")) {
-      try {
-        const backendRes = await fetch(`${BACKEND_URL}/admin/properties`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          cache: "no-store",
-        });
-
-        if (backendRes.ok) {
-          const data = await backendRes.json();
-          const properties = data.data?.properties || [];
-          if (properties.length > 0) {
-            return NextResponse.json({
-              success: true,
-              properties,
-              source: "express_backend",
-            });
-          }
-        }
-      } catch (backendErr) {
-        console.warn("[Admin Properties API] Express backend unreachable, using local fallback");
-      }
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
-    // 2. Local fallback
-    const properties = await prisma.property.findMany({
-      include: {
-        roomTypes: {
-          include: {
-            rooms: {
-              include: {
-                inventoryUnits: true,
-              },
-            },
-          },
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/admin/properties`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        _count: {
-          select: {
-            bookings: true,
-            visitRequests: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin properties service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    return NextResponse.json({ success: true, properties, source: "local_prisma" });
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to load properties." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        properties: data.data?.properties || [],
+        source: "express_backend",
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin();
+    await requireAdmin();
+    const token = await getAdminToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+
     const body = await request.json();
     const {
       id,
       name,
-      slug,
       tagline,
       description,
       address,
@@ -95,89 +85,84 @@ export async function POST(request: Request) {
       rules,
       checkInTime,
       checkOutTime,
-      timezone,
       coverImage,
+      pricePerNight,
     } = body;
 
     if (!name || !address || !contactPhone || !contactEmail) {
       return NextResponse.json(
         { error: "Name, address, contact phone, and contact email are required." },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    let property;
-    if (id) {
-      property = await prisma.property.update({
-        where: { id },
-        data: {
-          name,
-          tagline,
-          description: description || "",
-          address,
-          city: city || "Bengaluru",
-          state: state || "Karnataka",
-          pincode: pincode || "560034",
-          contactPhone,
-          contactEmail,
-          rules,
-          checkInTime: checkInTime || "12:00 PM",
-          checkOutTime: checkOutTime || "11:00 AM",
-          timezone: timezone || "Asia/Kolkata",
-          coverImage: coverImage || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80",
-        },
-      });
+    const baseUrl = getServerBackendUrl();
+    const targetUrl = id ? `${baseUrl}/properties/${encodeURIComponent(id)}` : `${baseUrl}/properties`;
+    const method = id ? "PATCH" : "POST";
 
-      await prisma.auditLog.create({
-        data: {
-          adminEmail: admin.email,
-          action: "UPDATE_PROPERTY",
-          entityType: "Property",
-          entityId: id,
-          details: `Updated property settings for ${name}`,
-        },
-      });
-    } else {
-      const generatedSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      property = await prisma.property.create({
-        data: {
-          name,
-          slug: generatedSlug,
-          tagline,
-          description: description || "Modern coliving property with fully furnished rooms.",
-          address,
-          city: city || "Bengaluru",
-          state: state || "Karnataka",
-          pincode: pincode || "560034",
-          contactPhone,
-          contactEmail,
-          rules: rules || "Quiet hours after 10 PM. Visitors allowed in lounge until 8 PM.",
-          checkInTime: checkInTime || "12:00 PM",
-          checkOutTime: checkOutTime || "11:00 AM",
-          timezone: timezone || "Asia/Kolkata",
-          coverImage: coverImage || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80",
-          images: JSON.stringify([
-            coverImage || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80",
-          ]),
-        },
-      });
+    const payload: Record<string, unknown> = {
+      title: String(name).trim(),
+      description:
+        description && String(description).trim().length >= 10
+          ? String(description).trim()
+          : `${String(name).trim()} residence in ${city || "Bengaluru"}`,
+      address: String(address).trim(),
+      city: city || "Bengaluru",
+      state: state || "Karnataka",
+      postal_code: pincode || "560034",
+      ...(tagline !== undefined ? { tagline } : {}),
+      ...(rules !== undefined ? { rules } : {}),
+      ...(checkInTime ? { check_in_time: checkInTime } : {}),
+      ...(checkOutTime ? { check_out_time: checkOutTime } : {}),
+      ...(coverImage && /^https?:\/\//i.test(String(coverImage)) ? { images: [String(coverImage).trim()] } : {}),
+    };
 
-      await prisma.auditLog.create({
-        data: {
-          adminEmail: admin.email,
-          action: "CREATE_PROPERTY",
-          entityType: "Property",
-          entityId: property.id,
-          details: `Created new property: ${name}`,
-        },
-      });
+    if (!id) {
+      payload.property_type = "apartment";
+      payload.room_type = "private_room";
+      payload.country = "India";
+      payload.price_per_night = Number(pricePerNight || 1000);
     }
 
-    return NextResponse.json({ success: true, property, message: "Property saved successfully." });
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(targetUrl, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Admin properties service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to save property." },
+        { status: backendRes.status >= 400 ? backendRes.status : 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        property: data.data?.property || data.data,
+        message: id ? "Property updated successfully." : "Property created successfully.",
+        source: "express_backend",
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error: any) {
     if (error.message === "UNAUTHORIZED_ADMIN_REQUIRED") {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json({ error: "Admin access required." }, { status: 403, headers: NO_STORE_HEADERS });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

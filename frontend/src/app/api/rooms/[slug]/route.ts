@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { backendPropertyToFrontendRoom } from "@/lib/api/adapters";
-
-const BACKEND_URL =
-  process.env.API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5000/api/v1";
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { getServerBackendUrl } from "@/lib/api/config";
 
 export async function GET(
   request: Request,
@@ -17,83 +9,43 @@ export async function GET(
   try {
     const { slug } = await context.params;
 
-    // 1. If slug is a UUID, attempt to query authoritative Express backend
-    if (UUID_REGEX.test(slug)) {
-      try {
-        const backendRes = await fetch(`${BACKEND_URL}/properties/${slug}`, {
-          cache: "no-store",
-        });
-
-        if (backendRes.ok) {
-          const data = await backendRes.json();
-          const property = data.data?.property || data.data;
-          if (property) {
-            const adapted = backendPropertyToFrontendRoom(property);
-            return NextResponse.json({
-              success: true,
-              room: adapted,
-              source: "express_backend",
-            });
-          }
-        }
-      } catch (err) {
-        console.warn(`[Rooms API] Failed fetching property ${slug} from backend, checking local db`);
-      }
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/properties/${encodeURIComponent(slug)}`, {
+        cache: "no-store",
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Room details service is unavailable. Please ensure the backend server is running." },
+        { status: 503 }
+      );
     }
 
-    // 2. Query local database by slug or id
-    const roomType = await prisma.roomType.findFirst({
-      where: {
-        OR: [{ slug }, { id: slug }],
-      },
-      include: {
-        property: true,
-        ratePlans: {
-          where: { isEnabled: true },
-        },
-        rooms: {
-          where: { status: "ACTIVE" },
-          include: {
-            inventoryUnits: true,
-          },
-        },
-      },
-    });
-
-    if (!roomType) {
+    if (backendRes.status === 404) {
       return NextResponse.json({ error: "Room not found." }, { status: 404 });
     }
 
-    let parsedImages: string[] = [];
-    try {
-      parsedImages = JSON.parse(roomType.images);
-    } catch {
-      parsedImages = [];
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errData.message || errData.error || "Failed to fetch room details." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502 }
+      );
     }
 
-    let parsedAmenities: string[] = [];
-    try {
-      parsedAmenities = JSON.parse(roomType.keyAmenities);
-    } catch {
-      parsedAmenities = [];
+    const data = await backendRes.json();
+    const property = data.data?.property || data.data;
+    if (!property) {
+      return NextResponse.json({ error: "Room not found." }, { status: 404 });
     }
 
-    const totalUnits = roomType.rooms.reduce(
-      (acc, r) => acc + r.inventoryUnits.length,
-      0
-    );
-
+    const adapted = backendPropertyToFrontendRoom(property);
     return NextResponse.json({
       success: true,
-      room: {
-        ...roomType,
-        images: parsedImages,
-        keyAmenities: parsedAmenities,
-        totalUnits,
-      },
-      source: "local_prisma",
+      room: adapted,
+      source: "express_backend",
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to fetch room details." }, { status: 500 });
   }
 }

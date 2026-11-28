@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
-import { getCurrentUser, JWT_COOKIE_NAME } from "@/lib/auth";
+import { JWT_COOKIE_NAME } from "@/lib/auth";
 import { getServerBackendUrl } from "@/lib/api/config";
 import { backendBookingToFrontend } from "@/lib/api/adapters";
 
@@ -19,135 +18,66 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const { reason = "Customer requested cancellation" } = body;
 
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const cookieStore = await cookies();
+    const token =
+      cookieStore.get(JWT_COOKIE_NAME)?.value ||
+      cookieStore.get("token")?.value ||
+      request.headers.get("Authorization")?.replace("Bearer ", "");
 
-    // 1. If ID is a UUID, attempt to cancel on authoritative Express backend
-    if (UUID_REGEX.test(id)) {
-      const cookieStore = await cookies();
-      const token =
-        cookieStore.get(JWT_COOKIE_NAME)?.value ||
-        cookieStore.get("token")?.value ||
-        request.headers.get("Authorization")?.replace("Bearer ", "");
-
-      if (token && token.includes(".")) {
-        try {
-          const backendRes = await fetch(`${getServerBackendUrl()}/bookings/${id}/cancel`, {
-            method: "PATCH",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ reason }),
-          });
-
-          if (backendRes.ok) {
-            const data = await backendRes.json();
-            const b = data.data?.booking || data.data;
-            return NextResponse.json(
-              {
-                success: true,
-                booking: b ? backendBookingToFrontend(b) : null,
-                message: "Booking has been cancelled successfully.",
-                source: "express_backend",
-              },
-              { headers: NO_STORE_HEADERS }
-            );
-          }
-
-          if ([400, 401, 403, 404, 409].includes(backendRes.status)) {
-            const errData = await backendRes.json().catch(() => ({}));
-            return NextResponse.json(
-              { error: errData.message || errData.error || "Unable to cancel booking." },
-              { status: backendRes.status, headers: NO_STORE_HEADERS }
-            );
-          }
-        } catch {
-          console.warn("[Cancel Booking] Express backend cancel failed, falling back to local");
-        }
-      }
-    }
-
-    // 2. Local fallback
-    const booking = await prisma.booking.findUnique({
-      where: { id },
-      include: { payments: true },
-    });
-
-    if (!booking) {
-      return NextResponse.json({ error: "Booking not found." }, { status: 404 });
-    }
-
-    const isAdmin = user.role === "ADMIN";
-    const isOwner =
-      booking.userId === user.id ||
-      (!!booking.guestEmail &&
-        booking.guestEmail.toLowerCase() === user.email.toLowerCase());
-    if (!isAdmin && !isOwner) {
+    if (!token || !token.includes(".")) {
       return NextResponse.json(
-        { error: "Access denied." },
-        { status: 403, headers: NO_STORE_HEADERS }
+        { error: "Unauthorized" },
+        { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
-    if (booking.status === "CANCELLED") {
-      return NextResponse.json({ error: "Booking is already cancelled." }, { status: 400 });
+    if (!UUID_REGEX.test(id)) {
+      return NextResponse.json(
+        { error: "Invalid booking identifier." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
-    const now = new Date();
-    const hoursToStart = (booking.startTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    let eligibleRefund = 0;
-    if (booking.paymentStatus === "PAID") {
-      if (hoursToStart > 48) {
-        eligibleRefund = booking.totalAmount;
-      } else if (hoursToStart > 24) {
-        eligibleRefund = Math.round(booking.basePrice * 0.5 + booking.depositAmount);
-      } else {
-        eligibleRefund = booking.depositAmount;
-      }
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const b = await tx.booking.update({
-        where: { id },
-        data: {
-          status: "CANCELLED",
-          cancellationReason: reason,
-          cancellationRequestedAt: now,
-          paymentStatus: eligibleRefund > 0 ? "PARTIALLY_REFUNDED" : booking.paymentStatus,
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/bookings/${id}/cancel`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({ reason }),
+        cache: "no-store",
       });
+    } catch {
+      return NextResponse.json(
+        { error: "Booking cancellation service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
 
-      if (eligibleRefund > 0) {
-        await tx.refund.create({
-          data: {
-            bookingId: b.id,
-            amount: eligibleRefund,
-            reason: `Cancellation request: ${reason} (${hoursToStart > 48 ? "Standard full window" : "Short notice policy"})`,
-            status: "REQUESTED",
-          },
-        });
-      }
+    const data = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: data.message || data.error || "Unable to cancel booking." },
+        { status: backendRes.status >= 400 ? backendRes.status : 502, headers: NO_STORE_HEADERS }
+      );
+    }
 
-      await tx.bookingItem.deleteMany({
-        where: { bookingId: b.id },
-      });
-
-      return b;
-    });
-
-    return NextResponse.json({
-      success: true,
-      booking: updated,
-      eligibleRefund,
-      message: `Booking has been cancelled. Refund of ₹${eligibleRefund.toLocaleString("en-IN")} requested.`,
-      source: "local_prisma",
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to cancel booking.";
-    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS });
+    const b = data.data?.booking || data.data;
+    return NextResponse.json(
+      {
+        success: true,
+        booking: b ? backendBookingToFrontend(b) : null,
+        message: "Booking has been cancelled successfully.",
+        source: "express_backend",
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || "Unable to cancel booking." },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

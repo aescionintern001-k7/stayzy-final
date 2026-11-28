@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
-import {
-  createSessionToken,
-  hashPassword,
-  JWT_COOKIE_NAME,
-  LEGACY_SESSION_COOKIE_NAME,
-} from "@/lib/auth";
-import { firebaseConfig } from "@/lib/firebase";
+import { JWT_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME } from "@/lib/auth";
+import { getServerBackendUrl } from "@/lib/api/config";
+import { backendRoleToFrontend } from "@/lib/api/adapters";
+
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, private" };
 
 /**
- * Verifies a Firebase Google Sign-In ID token via Google's Identity Toolkit
- * lookup endpoint and issues a Stayzy HTTP-only session cookie.
+ * Proxies Firebase Google Sign-In ID token verification to the shared Express
+ * backend (PostgreSQL) and issues Stayzy HTTP-only session cookies.
  */
 export async function POST(request: Request) {
   try {
@@ -21,69 +17,58 @@ export async function POST(request: Request) {
     if (!idToken || typeof idToken !== "string") {
       return NextResponse.json(
         { error: "Missing Google authentication token." },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    const verifyRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(
-        firebaseConfig.apiKey
-      )}`,
-      {
+    let backendRes: Response;
+    try {
+      backendRes = await fetch(`${getServerBackendUrl()}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      }
-    );
-
-    if (!verifyRes.ok) {
-      return NextResponse.json(
-        { error: "Google token verification failed. Please try again." },
-        { status: 401 }
-      );
-    }
-
-    const verifyData = await verifyRes.json();
-    const firebaseUser = verifyData?.users?.[0];
-    const verifiedEmail = firebaseUser?.email?.toLowerCase().trim();
-
-    if (!verifiedEmail) {
-      return NextResponse.json(
-        { error: "No verified email was returned by Google." },
-        { status: 401 }
-      );
-    }
-
-    let user = await prisma.user.findUnique({
-      where: { email: verifiedEmail },
-    });
-
-    if (!user) {
-      const displayName =
-        firebaseUser?.displayName?.trim() || verifiedEmail.split("@")[0];
-      user = await prisma.user.create({
-        data: {
-          name: displayName,
-          email: verifiedEmail,
-          passwordHash: hashPassword(crypto.randomBytes(24).toString("hex")),
-          role: "CUSTOMER",
-        },
+        body: JSON.stringify({ idToken: idToken.trim() }),
+        cache: "no-store",
       });
+    } catch {
+      return NextResponse.json(
+        { error: "Authentication service is unavailable. Please ensure the backend server is running." },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
     }
 
-    const token = createSessionToken(user);
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errData.message || errData.error || "Google token verification failed. Please try again." },
+        { status: backendRes.status >= 400 ? backendRes.status : 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const data = await backendRes.json();
+    const { token, user } = data.data || {};
+    if (!token || !user) {
+      return NextResponse.json(
+        { error: "Invalid Google authentication response from backend." },
+        { status: 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const cookieMaxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
 
-    const response = NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
+    const response = NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: user.id,
+          name: user.full_name || user.name,
+          email: user.email,
+          phone: user.phone || null,
+          role: backendRoleToFrontend(user.role),
+        },
+        token,
       },
-    });
+      { headers: NO_STORE_HEADERS }
+    );
 
     response.cookies.set(JWT_COOKIE_NAME, token, {
       httpOnly: true,
@@ -92,21 +77,13 @@ export async function POST(request: Request) {
       maxAge: cookieMaxAge,
       sameSite: "lax",
     });
-
-    response.cookies.set(LEGACY_SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: cookieMaxAge,
-      sameSite: "lax",
-    });
+    response.cookies.delete(LEGACY_SESSION_COOKIE_NAME);
 
     return response;
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Unable to complete Google Sign-In." },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
-

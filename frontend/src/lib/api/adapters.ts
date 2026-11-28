@@ -4,6 +4,7 @@ import {
   BackendUser,
   BackendProperty,
   BackendBooking,
+  BackendPayment,
 } from "./types";
 import { SessionUser } from "../auth";
 
@@ -70,6 +71,7 @@ export function backendPropertyToFrontendRoom(property: BackendProperty) {
 
   return {
     id: property.id,
+    roomTypeId: property.room_types?.[0]?.id || property.id,
     name: property.title,
     title: property.title,
     slug: property.id,
@@ -141,27 +143,123 @@ export function backendPropertyToFrontendRoom(property: BackendProperty) {
 /**
  * Adapts an Express backend booking into the frontend booking interface.
  */
-export function backendBookingToFrontend(booking: BackendBooking) {
+type BackendBookingWithDetails = BackendBooking & {
+  booking_reference?: string;
+  duration_type?: string;
+  duration_count?: number;
+  start_time?: string;
+  end_time?: string;
+  base_price?: number | string;
+  food_charges?: number | string;
+  taxes?: number | string;
+  deposit_amount?: number | string;
+  payable_now?: number | string;
+  balance_remaining?: number | string;
+  keyless_code?: string | null;
+  room_type?: { id?: string; name?: string; slug?: string; category?: string } | null;
+  unit?: { id?: string; identifier?: string; room_number?: string; floor?: number } | null;
+};
+
+export function backendBookingToFrontend(booking: BackendBookingWithDetails) {
+  const adaptedProperty = booking.property ? backendPropertyToFrontendRoom(booking.property) : null;
+  const adaptedRoomType = adaptedProperty
+    ? {
+        ...adaptedProperty,
+        ...(booking.room_type?.id ? { id: booking.room_type.id } : {}),
+        ...(booking.room_type?.name ? { name: booking.room_type.name, title: booking.room_type.name } : {}),
+        ...(booking.room_type?.slug ? { slug: booking.room_type.slug } : {}),
+        ...(booking.room_type?.category ? { category: booking.room_type.category } : {}),
+      }
+    : null;
+
+  const totalAmount = Number(booking.total_price ?? 0);
+  const depositAmount = Number(booking.deposit_amount ?? 0);
+  const startTime = booking.start_time || booking.check_in_date;
+  const endTime = booking.end_time || booking.check_out_date;
+
   return {
     id: booking.id,
-    status: booking.status.toUpperCase(),
-    paymentStatus: booking.payment_status.toUpperCase(),
+    bookingReference: booking.booking_reference || booking.id,
+    status: String(booking.status || "pending").toUpperCase(),
+    paymentStatus: String(booking.payment_status || "unpaid").toUpperCase(),
+    durationType: String(booking.duration_type || "MONTHLY").toUpperCase(),
+    durationCount: Number(booking.duration_count ?? 1),
     startDate: booking.check_in_date,
     endDate: booking.check_out_date,
+    startTime,
+    endTime,
     totalNights: booking.total_nights,
-    totalPrice: Number(booking.total_price),
-    pricePerNight: Number(booking.price_per_night),
-    currency: booking.currency,
-    guestsCount: booking.guests_count,
+    totalPrice: totalAmount,
+    totalAmount,
+    basePrice: Number(booking.base_price ?? totalAmount),
+    foodCharges: Number(booking.food_charges ?? 0),
+    taxes: Number(booking.taxes ?? 0),
+    depositAmount,
+    securityDeposit: depositAmount,
+    payableNow: Number(booking.payable_now ?? totalAmount),
+    balanceRemaining: Number(booking.balance_remaining ?? 0),
+    pricePerNight: Number(booking.price_per_night ?? 0),
+    currency: booking.currency || "INR",
+    guestsCount: booking.guests_count ?? 1,
+    keylessCode: booking.keyless_code || null,
     specialRequests: booking.special_requests,
     cancellationReason: booking.cancellation_reason,
     cancelledAt: booking.cancelled_at,
     createdAt: booking.created_at,
     updatedAt: booking.updated_at,
-    roomType: booking.property ? backendPropertyToFrontendRoom(booking.property) : null,
-    property: booking.property ? backendPropertyToFrontendRoom(booking.property) : null,
+    roomType: adaptedRoomType,
+    property: adaptedProperty,
+    inventoryUnit: booking.unit
+      ? {
+          id: booking.unit.id || "",
+          identifier: booking.unit.identifier || booking.unit.room_number || "Assigned Unit",
+        }
+      : null,
     guest: booking.guest ? backendUserToFrontend(booking.guest) : null,
     payments: booking.payments || [],
     _backendBooking: booking,
+  };
+}
+
+type BackendPaymentWithBooking = BackendPayment & {
+  provider?: string;
+  booking?: {
+    id?: string;
+    booking_reference?: string;
+    property_id?: string;
+  } | null;
+  razorpay_order_id?: string | null;
+  razorpay_payment_id?: string | null;
+  verified_at?: string | null;
+};
+
+export function backendPaymentToFrontend(payment: BackendPaymentWithBooking) {
+  const rawStatus = String(payment.status || "created").toLowerCase();
+  const normalizedStatus =
+    rawStatus === "captured" || rawStatus === "success" || rawStatus === "paid"
+      ? "SUCCESS"
+      : rawStatus === "failed"
+        ? "FAILED"
+        : "PENDING";
+
+  return {
+    id: payment.id,
+    bookingId: payment.booking_id,
+    userId: payment.user_id,
+    amount: Number(payment.amount ?? 0),
+    currency: payment.currency || "INR",
+    provider: payment.provider || "RAZORPAY",
+    status: normalizedStatus,
+    transactionRef:
+      payment.razorpay_payment_id || payment.razorpay_order_id || payment.id,
+    paidAt: payment.verified_at || null,
+    createdAt: payment.created_at,
+    booking: payment.booking
+      ? {
+          id: payment.booking.id || payment.booking_id,
+          bookingReference: payment.booking.booking_reference || payment.booking_id,
+        }
+      : null,
+    _backendPayment: payment,
   };
 }
