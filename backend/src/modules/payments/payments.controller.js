@@ -1,4 +1,5 @@
 import paymentsService from "./payments.service.js";
+import { env } from "../../config/env.js";
 
 export const createOrder = async (req, res, next) => {
   try {
@@ -124,11 +125,45 @@ export const handleWebhook = async (req, res, next) => {
   }
 };
 
+export const reconcilePayment = async (req, res, next) => {
+  try {
+    const result = await paymentsService.reconcilePayment(req.user, req.body);
+    return res.status(200).json({
+      success: true,
+      message: "Payment reconciliation complete",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const demoSimulate = async (req, res, next) => {
+  try {
+    if (env.NODE_ENV === "production") {
+      return res.status(403).json({
+        success: false,
+        message: "Secure Payment Portal simulator is strictly disabled in production",
+      });
+    }
+    const result = await paymentsService.demoSimulatePayment(req.user, req.body);
+    return res.status(200).json({
+      success: true,
+      message: "Development payment simulation completed",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   createOrder,
   verifyPayment,
   recordFailure,
   processRefund,
+  reconcilePayment,
+  demoSimulate,
   getPaymentById,
   getPaymentsByBooking,
   getMyPayments,

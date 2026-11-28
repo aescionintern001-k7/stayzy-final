@@ -73,3 +73,29 @@ export const updateUserStatusSchema = z
     }),
   })
   .strict();
+
+export const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "Current password is required").max(72),
+    new_password: z
+      .string()
+      .min(8, "New password must be at least 8 characters")
+      .max(72, "New password must not exceed 72 characters"),
+  })
+  .strict()
+  .refine((data) => data.new_password !== data.current_password, {
+    message: "New password must be different from current password",
+    path: ["new_password"],
+  });
+
+export const favoriteRoomBodySchema = z
+  .object({
+    room_type_id: z.string().uuid("Invalid room_type_id UUID"),
+  })
+  .strict();
+
+export const favoriteRoomParamSchema = z
+  .object({
+    roomTypeId: z.string().uuid("Invalid roomTypeId UUID"),
+  })
+  .strict();

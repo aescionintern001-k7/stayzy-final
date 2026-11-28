@@ -3,8 +3,11 @@ import {
   checkPropertyAvailability as checkPropertyAvailabilityService,
   getGuestBookings as getGuestBookingsService,
   getPropertyReservations as getPropertyReservationsService,
+  getOwnerReservations as getOwnerReservationsService,
   getBookingById as getBookingByIdService,
+  recoverBookingByIdempotencyKey as recoverBookingByIdempotencyKeyService,
   cancelBooking as cancelBookingService,
+  extendBooking as extendBookingService,
   updateBookingStatus as updateBookingStatusService,
   calculatePricingService,
 } from "./bookings.service.js";
@@ -103,6 +106,23 @@ export const getBooking = async (req, res, next) => {
   }
 };
 
+export const recoverBooking = async (req, res, next) => {
+  try {
+    const booking = await recoverBookingByIdempotencyKeyService(
+      req.user.id,
+      req.params.idempotencyKey
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Booking recovered by idempotency key",
+      data: { booking },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * PATCH /api/v1/bookings/:id/cancel
  * Cancel a booking (Guest, Host, or Admin).
@@ -161,6 +181,42 @@ export const calculatePricing = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: "Pricing calculated successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/v1/bookings/owner
+ * Retrieve aggregated reservations across all properties owned by the host.
+ */
+export const getOwnerBookings = async (req, res, next) => {
+  try {
+    const result = await getOwnerReservationsService(req.user, req.query);
+
+    res.status(200).json({
+      success: true,
+      message: "Owner reservations retrieved successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/v1/bookings/:id/extend
+ * Extend an existing booking duration with live overlap checking.
+ */
+export const extendBooking = async (req, res, next) => {
+  try {
+    const result = await extendBookingService(req.params.id, req.user, req.body);
+
+    res.status(200).json({
+      success: true,
+      message: "Booking extended successfully",
       data: result,
     });
   } catch (error) {

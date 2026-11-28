@@ -1,11 +1,14 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validateRequest.js";
+import { bookingMutationLimiter } from "../../config/security.js";
 import {
   createOrder,
   verifyPayment,
   recordFailure,
   processRefund,
+  reconcilePayment,
+  demoSimulate,
   getPaymentById,
   getPaymentsByBooking,
   getMyPayments,
@@ -16,6 +19,8 @@ import {
   verifyPaymentSchema,
   failPaymentSchema,
   refundPaymentBodySchema,
+  reconcilePaymentSchema,
+  demoSimulateSchema,
   paymentIdParamSchema,
   bookingIdParamSchema,
   listPaymentsQuerySchema,
@@ -32,6 +37,7 @@ router.use(authenticate);
 // 2. Create Razorpay order for an eligible booking
 router.post(
   "/create-order",
+  bookingMutationLimiter,
   validateRequest({ body: createOrderSchema }),
   createOrder
 );
@@ -39,6 +45,7 @@ router.post(
 // 3. Verify server-side HMAC SHA-256 signature and capture payment
 router.post(
   "/verify",
+  bookingMutationLimiter,
   validateRequest({ body: verifyPaymentSchema }),
   verifyPayment
 );
@@ -48,6 +55,21 @@ router.post(
   "/fail",
   validateRequest({ body: failPaymentSchema }),
   recordFailure
+);
+
+// 4b. Reconcile pending or created orders with Razorpay
+router.post(
+  "/reconcile",
+  bookingMutationLimiter,
+  validateRequest({ body: reconcilePaymentSchema }),
+  reconcilePayment
+);
+
+// 4c. Dev/Test-only payment simulator (returns 403 Forbidden in production)
+router.post(
+  "/demo-simulate",
+  validateRequest({ body: demoSimulateSchema }),
+  demoSimulate
 );
 
 // 5. Paginated payment transactions for authenticated guest

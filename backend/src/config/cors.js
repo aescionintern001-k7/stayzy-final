@@ -12,11 +12,14 @@ export const corsOptions = {
       return callback(null, true);
     }
 
-    return callback(new Error(`CORS blocked origin: ${origin}`));
+    const err = new Error(`CORS blocked origin: ${origin}`);
+    err.status = 403;
+    return callback(err);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Request-Id"],
+  exposedHeaders: ["X-Request-Id"],
 };
 
 export const corsMiddleware = cors(corsOptions);

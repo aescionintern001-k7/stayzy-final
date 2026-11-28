@@ -72,6 +72,8 @@ test.describe("Environment Configuration & Security Validation Tests", () => {
     const parsed = envSchema.safeParse({
       ...baseValidConfig,
       NODE_ENV: "production",
+      CORS_ORIGIN: "https://stayzy.example.com",
+      DB_NAME: "stayzy_prod",
       RAZORPAY_KEY_ID: "rzp_live_realproductionkey12345",
       RAZORPAY_KEY_SECRET: "rzp_live_secret_realproductionsecret67890",
       RAZORPAY_WEBHOOK_SECRET: "rzp_live_webhook_realsecret112233",

@@ -9,8 +9,14 @@ const migrationsDir = path.join(__dirname, "migrations");
 
 export async function runMigrations() {
   const client = await pool.connect();
+  const MIGRATION_LOCK_KEY = 739182;
+  let lockAcquired = false;
   try {
     console.log("=== Stayzy Database Migration Runner ===");
+
+    // Acquire session-level advisory lock so concurrent deploys serialize migrations safely
+    await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+    lockAcquired = true;
 
     // 1. Ensure migrations tracking table exists
     await client.query(`
@@ -67,6 +73,9 @@ export async function runMigrations() {
       console.log(`Successfully applied ${newlyApplied} new migration(s).`);
     }
   } finally {
+    if (lockAcquired) {
+      await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
+    }
     client.release();
     await pool.end();
   }

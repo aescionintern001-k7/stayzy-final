@@ -30,6 +30,42 @@ const imageUrlSchema = z
     message: "Image URL must use HTTP or HTTPS protocol",
   });
 
+const nestedRatePlanSchema = z.object({
+  duration_type: z.enum(["HOURLY", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
+  price: z.coerce.number().nonnegative(),
+  is_enabled: z.boolean().default(true),
+  min_duration: z.coerce.number().int().min(1).default(1),
+  max_duration: z.coerce.number().int().min(1).nullable().optional(),
+  allowed_hours_start: z.string().trim().max(10).default("08:00"),
+  allowed_hours_end: z.string().trim().max(10).default("22:00"),
+  deposit_amount: z.coerce.number().nonnegative().default(0),
+  food_monthly_charge: z.coerce.number().nonnegative().default(0),
+  electricity_rule: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+const nestedRoomTypeSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  slug: z.string().trim().min(2).max(160).optional(),
+  category: z
+    .enum(["PRIVATE", "TWIN_SHARING", "TRIPLE_SHARING", "DORMITORY", "STUDIO"])
+    .default("PRIVATE"),
+  description: z.string().trim().max(2000).default(""),
+  size_sq_ft: z.coerce.number().int().positive().default(220),
+  base_capacity: z.coerce.number().int().min(1).default(1),
+  max_capacity: z.coerce.number().int().min(1).default(2),
+  has_ac: z.boolean().default(true),
+  bathroom_type: z.enum(["ATTACHED", "COMMON"]).default("ATTACHED"),
+  food_included: z.boolean().default(false),
+  food_details: z.string().trim().max(500).nullable().optional(),
+  gender_eligibility: z.enum(["COLIVING", "MALE", "FEMALE"]).default("COLIVING"),
+  amenities: z.array(z.string().trim().min(1)).default([]),
+  images: z.array(imageUrlSchema).default([]),
+  room_numbers: z.array(z.string().trim().min(1).max(20)).min(1).default(["101"]),
+  beds_per_room: z.coerce.number().int().min(1).max(12).default(1),
+  rate_plans: z.array(nestedRatePlanSchema).default([]),
+});
+
 /**
  * Validator for creating a new property listing (POST /api/v1/properties).
  * Host or Admin only.
@@ -109,6 +145,12 @@ export const createPropertySchema = z
       })
       .default("active"),
     is_available: z.boolean().default(true),
+    tagline: z.string().trim().max(255).optional().nullable(),
+    rules: z.string().trim().max(3000).optional().nullable(),
+    check_in_time: z.string().trim().max(30).optional(),
+    check_out_time: z.string().trim().max(30).optional(),
+    gender_policy: z.enum(["COLIVING", "MALE", "FEMALE"]).optional(),
+    room_types: z.array(nestedRoomTypeSchema).optional(),
   })
   .strict();
 
@@ -150,6 +192,11 @@ export const updatePropertySchema = z
     images: z.array(imageUrlSchema).optional(),
     status: z.enum(propertyStatuses).optional(),
     is_available: z.boolean().optional(),
+    tagline: z.string().trim().max(255).optional().nullable(),
+    rules: z.string().trim().max(3000).optional().nullable(),
+    check_in_time: z.string().trim().max(30).optional(),
+    check_out_time: z.string().trim().max(30).optional(),
+    gender_policy: z.enum(["COLIVING", "MALE", "FEMALE"]).optional(),
   })
   .strict()
   .refine((data) => Object.keys(data).length > 0, {

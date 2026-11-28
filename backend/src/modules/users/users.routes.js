@@ -5,12 +5,19 @@ import { validateRequest } from "../../middlewares/validateRequest.js";
 import {
   getMe,
   updateMe,
+  changePassword,
+  getFavorites,
+  addFavorite,
+  removeFavorite,
   listUsers,
   getUser,
   changeUserStatus,
 } from "./users.controller.js";
 import {
   updateProfileSchema,
+  changePasswordSchema,
+  favoriteRoomBodySchema,
+  favoriteRoomParamSchema,
   listUsersQuerySchema,
   userIdParamSchema,
   updateUserStatusSchema,
@@ -18,13 +25,32 @@ import {
 
 const router = Router();
 
-// Current user profile endpoints (any authenticated user)
+// Current user profile & favorites endpoints (any authenticated user)
 router.get("/me", authenticate, getMe);
 router.patch(
   "/me",
   authenticate,
   validateRequest({ body: updateProfileSchema }),
   updateMe
+);
+router.patch(
+  "/me/password",
+  authenticate,
+  validateRequest({ body: changePasswordSchema }),
+  changePassword
+);
+router.get("/me/favorites", authenticate, getFavorites);
+router.post(
+  "/me/favorites",
+  authenticate,
+  validateRequest({ body: favoriteRoomBodySchema }),
+  addFavorite
+);
+router.delete(
+  "/me/favorites/:roomTypeId",
+  authenticate,
+  validateRequest({ params: favoriteRoomParamSchema }),
+  removeFavorite
 );
 
 // Admin user management endpoints

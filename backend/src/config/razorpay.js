@@ -84,6 +84,21 @@ export const processRazorpayRefund = async (
 };
 
 /**
+ * Fetch payments linked to a Razorpay Order for reconciliation.
+ * In test or local fallback key mode returns null unless live Razorpay SDK is configured.
+ */
+export const fetchRazorpayOrderPayments = async (orderId) => {
+  if (
+    env.NODE_ENV === "test" ||
+    env.RAZORPAY_KEY_ID.startsWith("rzp_test_stayzy")
+  ) {
+    return null;
+  }
+
+  return await razorpayClient.orders.fetchPayments(orderId);
+};
+
+/**
  * Verify Razorpay payment signature using timing-safe HMAC-SHA256 comparison.
  */
 export const verifyRazorpaySignature = ({
@@ -154,6 +169,7 @@ export default {
   getRazorpayClient,
   createRazorpayOrder,
   processRazorpayRefund,
+  fetchRazorpayOrderPayments,
   verifyRazorpaySignature,
   generateRazorpaySignature,
   verifyWebhookSignature,

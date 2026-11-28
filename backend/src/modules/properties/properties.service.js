@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import pool from "../../database/pool.js";
 
 export const PROPERTY_COLUMNS = [
@@ -24,6 +25,12 @@ export const PROPERTY_COLUMNS = [
   "images",
   "status",
   "is_available",
+  "tagline",
+  "rules",
+  "check_in_time",
+  "check_out_time",
+  "timezone",
+  "gender_policy",
   "created_at",
   "updated_at",
 ];
@@ -91,6 +98,12 @@ const formatPropertyRow = (row) => {
       : JSON.parse(row.images || "[]"),
     status: row.status,
     is_available: row.is_available,
+    tagline: row.tagline ?? null,
+    rules: row.rules ?? null,
+    check_in_time: row.check_in_time || "12:00 PM",
+    check_out_time: row.check_out_time || "11:00 AM",
+    timezone: row.timezone || "Asia/Kolkata",
+    gender_policy: row.gender_policy || "COLIVING",
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -109,54 +122,178 @@ const formatPropertyRow = (row) => {
 };
 
 /**
- * Create a new property listing.
+ * Create a new property listing (optionally provisioning room_types, physical units & rate plans).
  */
 export const createProperty = async (hostId, propertyData) => {
   await verifyHostAccount(hostId);
 
-  const query = `
-    INSERT INTO properties (
-      host_id, title, description, property_type, room_type,
-      price_per_night, currency, address, city, state, country, postal_code,
-      latitude, longitude, max_guests, bedrooms, beds, bathrooms,
-      amenities, images, status, is_available
-    )
-    VALUES (
-      $1, $2, $3, $4, $5,
-      $6, $7, $8, $9, $10, $11, $12,
-      $13, $14, $15, $16, $17, $18,
-      $19::jsonb, $20::jsonb, $21, $22
-    )
-    RETURNING *
-  `;
+  const hasNestedRooms =
+    Array.isArray(propertyData.room_types) && propertyData.room_types.length > 0;
+  const client = hasNestedRooms ? await pool.connect() : null;
+  const executor = client || pool;
 
-  const values = [
-    hostId,
-    propertyData.title.trim(),
-    propertyData.description.trim(),
-    propertyData.property_type,
-    propertyData.room_type || "entire_place",
-    propertyData.price_per_night,
-    propertyData.currency || "USD",
-    propertyData.address.trim(),
-    propertyData.city.trim(),
-    propertyData.state ? propertyData.state.trim() : null,
-    propertyData.country.trim(),
-    propertyData.postal_code ? propertyData.postal_code.trim() : null,
-    propertyData.latitude !== undefined ? propertyData.latitude : null,
-    propertyData.longitude !== undefined ? propertyData.longitude : null,
-    propertyData.max_guests ?? 1,
-    propertyData.bedrooms ?? 1,
-    propertyData.beds ?? 1,
-    propertyData.bathrooms ?? 1.0,
-    JSON.stringify(propertyData.amenities || []),
-    JSON.stringify(propertyData.images || []),
-    propertyData.status || "active",
-    propertyData.is_available ?? true,
-  ];
+  try {
+    if (client) await client.query("BEGIN");
 
-  const result = await pool.query(query, values);
-  return formatPropertyRow(result.rows[0]);
+    const query = `
+      INSERT INTO properties (
+        host_id, title, description, property_type, room_type,
+        price_per_night, currency, address, city, state, country, postal_code,
+        latitude, longitude, max_guests, bedrooms, beds, bathrooms,
+        amenities, images, status, is_available,
+        tagline, rules, check_in_time, check_out_time, gender_policy
+      )
+      VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8, $9, $10, $11, $12,
+        $13, $14, $15, $16, $17, $18,
+        $19::jsonb, $20::jsonb, $21, $22,
+        $23, $24, $25, $26, $27
+      )
+      RETURNING *
+    `;
+
+    const values = [
+      hostId,
+      propertyData.title.trim(),
+      propertyData.description.trim(),
+      propertyData.property_type,
+      propertyData.room_type || "entire_place",
+      propertyData.price_per_night,
+      propertyData.currency || "USD",
+      propertyData.address.trim(),
+      propertyData.city.trim(),
+      propertyData.state ? propertyData.state.trim() : null,
+      propertyData.country.trim(),
+      propertyData.postal_code ? propertyData.postal_code.trim() : null,
+      propertyData.latitude !== undefined ? propertyData.latitude : null,
+      propertyData.longitude !== undefined ? propertyData.longitude : null,
+      propertyData.max_guests ?? 1,
+      propertyData.bedrooms ?? 1,
+      propertyData.beds ?? 1,
+      propertyData.bathrooms ?? 1.0,
+      JSON.stringify(propertyData.amenities || []),
+      JSON.stringify(propertyData.images || []),
+      propertyData.status || "active",
+      propertyData.is_available ?? true,
+      propertyData.tagline || null,
+      propertyData.rules || null,
+      propertyData.check_in_time || "12:00 PM",
+      propertyData.check_out_time || "11:00 AM",
+      propertyData.gender_policy || "COLIVING",
+    ];
+
+    const result = await executor.query(query, values);
+    const propertyRow = result.rows[0];
+
+    const createdRoomTypes = [];
+    if (hasNestedRooms) {
+      for (const rt of propertyData.room_types) {
+        const finalSlug =
+          rt.slug?.trim().toLowerCase() ||
+          `${rt.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "")}-${crypto.randomBytes(2).toString("hex")}`;
+
+        const rtRes = await executor.query(
+          `
+            INSERT INTO room_types (
+              property_id, name, slug, category, description, size_sq_ft,
+              base_capacity, max_capacity, has_ac, bathroom_type,
+              food_included, food_details, gender_eligibility,
+              amenities, images, is_active
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb, TRUE)
+            RETURNING *
+          `,
+          [
+            propertyRow.id,
+            rt.name.trim(),
+            finalSlug,
+            rt.category || "PRIVATE",
+            rt.description?.trim() || propertyRow.description,
+            rt.size_sq_ft ?? 220,
+            rt.base_capacity ?? 1,
+            rt.max_capacity ?? 2,
+            rt.has_ac ?? true,
+            rt.bathroom_type || "ATTACHED",
+            rt.food_included ?? false,
+            rt.food_details || null,
+            rt.gender_eligibility || "COLIVING",
+            JSON.stringify(rt.amenities || []),
+            JSON.stringify(rt.images || []),
+          ]
+        );
+        const createdRt = rtRes.rows[0];
+
+        const bedsPerRoom = rt.beds_per_room ?? 1;
+        const isBed =
+          bedsPerRoom > 1 ||
+          ["TWIN_SHARING", "TRIPLE_SHARING", "DORMITORY"].includes(createdRt.category);
+        for (const rn of rt.room_numbers || ["101"]) {
+          const roomRes = await executor.query(
+            "INSERT INTO rooms (room_type_id, room_number, floor, status) VALUES ($1, $2, $3, 'active') RETURNING id",
+            [createdRt.id, rn, Number.parseInt(rn, 10) || 1]
+          );
+          for (let b = 1; b <= bedsPerRoom; b++) {
+            const identifier = isBed ? `${rn}-${String.fromCharCode(64 + b)}` : rn;
+            await executor.query(
+              "INSERT INTO inventory_units (room_id, identifier, is_bed, status) VALUES ($1, $2, $3, 'available')",
+              [roomRes.rows[0].id, identifier, isBed]
+            );
+          }
+        }
+
+        const plans =
+          rt.rate_plans && rt.rate_plans.length > 0
+            ? rt.rate_plans
+            : [
+                { duration_type: "DAILY", price: propertyRow.price_per_night, deposit_amount: 500, is_enabled: true },
+                { duration_type: "MONTHLY", price: Number(propertyRow.price_per_night) * 25, deposit_amount: 10000, is_enabled: true },
+              ];
+        for (const rp of plans) {
+          await executor.query(
+            `
+              INSERT INTO rate_plans (
+                room_type_id, duration_type, price, is_enabled, min_duration, max_duration,
+                allowed_hours_start, allowed_hours_end, deposit_amount, food_monthly_charge, electricity_rule, notes
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            `,
+            [
+              createdRt.id,
+              rp.duration_type,
+              rp.price,
+              rp.is_enabled ?? true,
+              rp.min_duration ?? 1,
+              rp.max_duration ?? null,
+              rp.allowed_hours_start || "08:00",
+              rp.allowed_hours_end || "22:00",
+              rp.deposit_amount ?? 0,
+              rp.food_monthly_charge ?? 0,
+              rp.electricity_rule || "Included in rent",
+              rp.notes || null,
+            ]
+          );
+        }
+
+        createdRoomTypes.push(createdRt);
+      }
+      await client.query("COMMIT");
+    }
+
+    const formatted = formatPropertyRow(propertyRow);
+    if (createdRoomTypes.length > 0) {
+      formatted.room_types = createdRoomTypes;
+    }
+    return formatted;
+  } catch (err) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
 };
 
 /**

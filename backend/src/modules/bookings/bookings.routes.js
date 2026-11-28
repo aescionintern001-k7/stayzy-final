@@ -1,20 +1,26 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validateRequest.js";
+import { bookingMutationLimiter } from "../../config/security.js";
 import {
   createBooking,
   checkAvailability,
   getMyBookings,
   getPropertyReservations,
+  getOwnerBookings,
   getBooking,
+  recoverBooking,
   cancelBooking,
+  extendBooking,
   updateBookingStatus,
   calculatePricing,
 } from "./bookings.controller.js";
 import {
   createBookingSchema,
   bookingIdParamSchema,
+  recoverByIdempotencyKeyParamSchema,
   cancelBookingSchema,
+  extendBookingSchema,
   updateBookingStatusSchema,
   listBookingsQuerySchema,
   checkAvailabilityQuerySchema,
@@ -37,6 +43,7 @@ router.get("/calculate-pricing", calculatePricing);
 router.post(
   "/",
   authenticate,
+  bookingMutationLimiter,
   validateRequest({ body: createBookingSchema }),
   createBooking
 );
@@ -49,11 +56,27 @@ router.get(
   getMyBookings
 );
 
+// Authenticated (Host / Admin): View reservations across all owned properties
+router.get(
+  "/owner",
+  authenticate,
+  validateRequest({ query: listBookingsQuerySchema }),
+  getOwnerBookings
+);
+
 // Authenticated (Host / Admin): View reservations for a specific property
 router.get(
   "/property/:propertyId",
   authenticate,
   getPropertyReservations
+);
+
+// Authenticated (Guest): Recover a booking by client idempotency_key after timeout
+router.get(
+  "/recover/:idempotencyKey",
+  authenticate,
+  validateRequest({ params: recoverByIdempotencyKeyParamSchema }),
+  recoverBooking
 );
 
 // Authenticated (Guest, Host, Admin): View specific booking details
@@ -62,6 +85,14 @@ router.get(
   authenticate,
   validateRequest({ params: bookingIdParamSchema }),
   getBooking
+);
+
+// Authenticated (Guest, Host, Admin): Extend an existing booking
+router.post(
+  "/:id/extend",
+  authenticate,
+  validateRequest({ params: bookingIdParamSchema, body: extendBookingSchema }),
+  extendBooking
 );
 
 // Authenticated (Guest, Host, Admin): Cancel a booking

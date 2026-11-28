@@ -894,3 +894,530 @@ paths:
       responses:
         200:
           description: Revenue time-series report
+
+  /auth/google:
+    post:
+      tags: [Authentication]
+      summary: Sign in or register via verified Google/Firebase ID token
+      responses:
+        200:
+          description: Session token and rotating refresh token
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Exchange rotating refresh token for new access and refresh tokens
+      responses:
+        200:
+          description: New rotated session tokens
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke active refresh token session
+      responses:
+        200:
+          description: Logged out
+
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Request password reset token without leaking email existence
+      responses:
+        200:
+          description: Uniform reset acknowledgement
+
+  /auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Complete password reset using issued token
+      responses:
+        200:
+          description: Password updated
+
+  /users/me/password:
+    patch:
+      tags: [Users]
+      summary: Change authenticated user password
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Password updated
+
+  /users/me/favorites:
+    get:
+      tags: [Users]
+      summary: List favorite room types
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Favorites list
+    post:
+      tags: [Users]
+      summary: Save room type to favorites
+      security:
+        - bearerAuth: []
+      responses:
+        201:
+          description: Favorite saved
+
+  /users/me/favorites/{roomTypeId}:
+    delete:
+      tags: [Users]
+      summary: Remove room type from favorites
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Favorite removed
+
+  /rooms:
+    get:
+      tags: [Rooms]
+      summary: Browse & filter co-living room types with live bed availability & duration pricing
+      responses:
+        200:
+          description: Enriched room catalog
+
+  /rooms/{slugOrId}:
+    get:
+      tags: [Rooms]
+      summary: Detailed room type view with rate plans, available units & reviews
+      parameters:
+        - name: slugOrId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Room detail payload
+
+  /holds:
+    post:
+      tags: [Holds]
+      summary: Lock an available bed/unit for 15 minutes during checkout
+      responses:
+        201:
+          description: Temporary hold created with pricing breakdown
+
+  /holds/{token}:
+    get:
+      tags: [Holds]
+      summary: Inspect hold remaining TTL
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Active hold details
+    delete:
+      tags: [Holds]
+      summary: Release an active checkout hold
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Hold released
+
+  /bookings/owner:
+    get:
+      tags: [Bookings]
+      summary: Host/Admin aggregated reservations across owned properties
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Paginated owner reservations
+
+  /bookings/{id}/extend:
+    post:
+      tags: [Bookings]
+      summary: Extend active booking duration with 60-minute buffer conflict checks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Booking extended with delta breakdown
+
+  /payments/reconcile:
+    post:
+      tags: [Payments]
+      summary: Reconcile pending Razorpay orders and synchronize booking state
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Reconciliation outcome
+
+  /payments/demo-simulate:
+    post:
+      tags: [Payments]
+      summary: Development/Test-only payment outcome simulator (returns 403 Forbidden in production)
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Simulated payment outcome
+        403:
+          description: Strictly disabled in production
+
+  /visits/schedule:
+    post:
+      tags: [Visits]
+      summary: Schedule property walkthrough tour
+      responses:
+        201:
+          description: Visit scheduled
+
+  /visits/my:
+    get:
+      tags: [Visits]
+      summary: Resident's scheduled walkthrough visits
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Visit list
+
+  /visits/owner:
+    get:
+      tags: [Visits]
+      summary: Host walkthrough requests across owned properties
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Owner visits
+
+  /visits/{id}/status:
+    patch:
+      tags: [Visits]
+      summary: Update walkthrough visit status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Visit status updated
+
+  /support:
+    get:
+      tags: [Support]
+      summary: Resident's support tickets
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Ticket list
+    post:
+      tags: [Support]
+      summary: Submit new support ticket
+      security:
+        - bearerAuth: []
+      responses:
+        201:
+          description: Ticket created
+
+  /cities:
+    get:
+      tags: [Directory]
+      summary: A-Z 300+ cities directory with live property counts
+      responses:
+        200:
+          description: Directory index and live counts
+
+  /content:
+    get:
+      tags: [CMS]
+      summary: Public hero/FAQ/rules/contact CMS content and non-secret platform settings
+      responses:
+        200:
+          description: Public CMS content
+
+  /admin/users:
+    post:
+      tags: [Admin]
+      summary: Admin create user account
+      security:
+        - bearerAuth: []
+      responses:
+        201:
+          description: User created
+
+  /admin/users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Update user role with self-demotion guard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Role updated
+
+  /admin/customers:
+    get:
+      tags: [Admin]
+      summary: Customer CRM view with spend and booking metrics
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Customers list
+
+  /admin/rooms:
+    get:
+      tags: [Admin]
+      summary: Admin room types inventory overview
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Room types list
+    post:
+      tags: [Admin]
+      summary: Create room type with rooms, units, and 5-tier rate plans
+      security:
+        - bearerAuth: []
+      responses:
+        201:
+          description: Room type provisioned
+
+  /admin/beds:
+    get:
+      tags: [Admin]
+      summary: List physical inventory units and beds
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Bed matrix
+    post:
+      tags: [Admin]
+      summary: Add bed unit or update unit status
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Inventory unit updated
+
+  /admin/inventory/blocks:
+    post:
+      tags: [Admin]
+      summary: Block unit for maintenance, cleaning, or offline hold
+      security:
+        - bearerAuth: []
+      responses:
+        201:
+          description: Availability block created
+
+  /admin/inventory/blocks/{id}:
+    delete:
+      tags: [Admin]
+      summary: Remove availability block
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Block removed
+
+  /admin/calendar:
+    get:
+      tags: [Admin]
+      summary: Multi-property occupancy grid across bookings, blocks, and holds
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Calendar matrix
+
+  /admin/rates:
+    get:
+      tags: [Admin]
+      summary: List all rate plans
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Rate plans
+
+  /admin/rates/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update rate plan pricing, rules, or hourly window
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Rate plan updated
+
+  /admin/bookings/offline:
+    post:
+      tags: [Admin]
+      summary: Create walk-in/offline booking with optional immediate payment receipt
+      security:
+        - bearerAuth: []
+      responses:
+        201:
+          description: Offline booking created
+
+  /admin/payments/offline:
+    post:
+      tags: [Admin]
+      summary: Record manual offline payment settlement
+      security:
+        - bearerAuth: []
+      responses:
+        201:
+          description: Offline payment recorded
+
+  /admin/visits:
+    get:
+      tags: [Admin]
+      summary: List all property walkthrough requests
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Visits list
+
+  /admin/visits/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update walkthrough visit status and admin notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Visit updated
+
+  /admin/support:
+    get:
+      tags: [Admin]
+      summary: List support tickets platform-wide
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Tickets list
+
+  /admin/support/{id}/reply:
+    post:
+      tags: [Admin]
+      summary: Reply to and update support ticket status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Reply recorded
+
+  /admin/content:
+    get:
+      tags: [Admin]
+      summary: Get all CMS site content keys
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Content map
+    put:
+      tags: [Admin]
+      summary: Upsert CMS content block
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Content updated
+
+  /admin/settings:
+    get:
+      tags: [Admin]
+      summary: Retrieve platform settings (secrets redacted)
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Redacted settings
+    put:
+      tags: [Admin]
+      summary: Upsert platform setting
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Setting updated
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: Paginated security and administrative audit logs
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Audit log entries
+

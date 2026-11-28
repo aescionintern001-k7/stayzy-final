@@ -21,6 +21,9 @@ mobile/android/build/
 mobile/android/local.properties
 *.keystore
 !debug.keystore
+*.jks
+keystore.properties
+mobile/android/keystore.properties
 
 # misc
 .DS_Store

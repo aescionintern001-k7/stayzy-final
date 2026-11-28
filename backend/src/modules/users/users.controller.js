@@ -1,6 +1,10 @@
 import {
   getCurrentUserProfile,
   updateCurrentUserProfile,
+  changeCurrentUserPassword,
+  listUserFavorites,
+  addUserFavorite,
+  removeUserFavorite,
   getUsersList,
   getUserById,
   updateUserStatus,
@@ -90,6 +94,63 @@ export const changeUserStatus = async (req, res, next) => {
       success: true,
       message: "User status updated successfully",
       data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const changePassword = async (req, res, next) => {
+  try {
+    const result = await changeCurrentUserPassword(req.user.id, req.body);
+
+    res.set("Cache-Control", "no-store, private");
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFavorites = async (req, res, next) => {
+  try {
+    const favorites = await listUserFavorites(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Favorites retrieved successfully",
+      data: { favorites },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const addFavorite = async (req, res, next) => {
+  try {
+    const result = await addUserFavorite(req.user.id, req.body.room_type_id);
+
+    res.status(201).json({
+      success: true,
+      message: "Room added to favorites",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeFavorite = async (req, res, next) => {
+  try {
+    const result = await removeUserFavorite(req.user.id, req.params.roomTypeId);
+
+    res.status(200).json({
+      success: true,
+      message: "Room removed from favorites",
+      data: result,
     });
   } catch (error) {
     next(error);

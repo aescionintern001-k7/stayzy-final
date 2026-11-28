@@ -7,6 +7,7 @@ const basePoolConfig = {
   max: env.DB_POOL_MAX,
   idleTimeoutMillis: env.DB_IDLE_TIMEOUT_MS,
   connectionTimeoutMillis: env.DB_CONNECTION_TIMEOUT_MS,
+  statement_timeout: 15000,
 };
 
 export const pool = new Pool(

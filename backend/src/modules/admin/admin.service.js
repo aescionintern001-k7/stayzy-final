@@ -1,5 +1,6 @@
 import pool from "../../database/pool.js";
 import { deleteReview } from "../reviews/reviews.service.js";
+import * as ops from "./admin.ops.service.js";
 
 /**
  * Administrative platform dashboard statistics.
@@ -641,4 +642,5 @@ export default {
   getRevenueReport,
   getAdminReviews,
   deleteAdminReview,
+  ...ops,
 };
